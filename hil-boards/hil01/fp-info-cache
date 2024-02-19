@@ -1,4 +1,4 @@
-20904185462188935
+20905893259913986
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -17828,6 +17828,13 @@ connector JST ZE horizontal
 0
 18
 17
+Connector_Kefa
+TerminalBlock_Kefa_1x02_P6.35mm_Horizontal
+1x2P Corner pin Three sides 2 1 6.35mm 24A -40℃~+105℃ 450V Black 12~22 Straight pin 2.5 Plugin,P=6.35mm Barrier, see https://irrorwxhqiillo5p.ldycdn.com/KF7.62-aidqjBpqKirRljSrlipijlli.pdf 
+1x2P Corner pin Three sides 2 1 6.35mm 24A -40℃~+105℃ 450V Black 12~22 Straight pin 2.5 Plugin,P=6.35mm Barrier
+0
+2
+2
 Connector_Molex
 Molex_CLIK-Mate_502382-0270_1x02-1MP_P1.25mm_Vertical
 Molex CLIK-Mate series connector, 502382-0270 (http://www.molex.com/pdm_docs/sd/5023820270_sd.pdf), generated with kicad-footprint-generator
