@@ -1,3 +1,0 @@
-(sym_lib_table
-  (lib (name "Converter_DCDC_SMD")(type "KiCad")(uri "${KIPRJMOD}/library/Converter_DCDC_SMD.kicad_sym")(options "")(descr ""))
-)
