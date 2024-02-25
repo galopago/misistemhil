@@ -1,5 +1,5 @@
 
-(rules PCB burinido
+(rules PCB hil00
   (snap_angle 
     fortyfive_degree
   )
@@ -11,18 +11,18 @@
     (via_costs 50)
     (plane_via_costs 5)
     (start_ripup_costs 100)
-    (start_pass_no 2038)
+    (start_pass_no 2815)
     (layer_rule F.Cu
       (active on)
       (preferred_direction horizontal)
       (preferred_direction_trace_costs 1.0)
-      (against_preferred_direction_trace_costs 4.2)
+      (against_preferred_direction_trace_costs 3.7)
     )
     (layer_rule B.Cu
       (active on)
       (preferred_direction vertical)
       (preferred_direction_trace_costs 1.0)
-      (against_preferred_direction_trace_costs 1.3)
+      (against_preferred_direction_trace_costs 1.4)
     )
   )
   (rule
@@ -53,12 +53,12 @@
     "kicad_default" "Via[0-1]_800:400_um-kicad_default"
   )
   (class default
-    "Net-(C1-Pad1)" GND1 "Net-(C2-Pad1)" "Net-(C3-Pad1)" GND2 "Net-(C4-Pad1)" "Net-(C5-Pad1)" "Net-(C7-Pad1)"
-    "Net-(D1-Pad2)" "Net-(D2-Pad1)" VCC "Net-(J1-PadA5)" "Net-(J1-PadA6)" "Net-(J1-PadA7)" "unconnected-(J1-PadA8)" "Net-(J1-PadB5)"
-    "unconnected-(J1-PadB8)" "unconnected-(J1-PadS1)" "Net-(C6-Pad1)" /TX "Net-(J2-Pad1)" /IO0 /EN "Net-(J2-Pad4)"
-    /RX /RTS "Net-(Q1-Pad1)" /DTR "Net-(Q2-Pad1)" /CTS "Net-(R3-Pad1)" "Net-(R4-Pad1)"
-    "Net-(R5-Pad1)" "Net-(R5-Pad2)" "Net-(R6-Pad1)" "Net-(R6-Pad2)" "Net-(R12-Pad1)" "Net-(R13-Pad1)" "Net-(J2-Pad5)" "unconnected-(U3-Pad10)"
-    "unconnected-(U3-Pad11)" "unconnected-(U3-Pad12)" "unconnected-(U3-Pad15)" "Net-(Q1-Pad3)" "Net-(Q2-Pad3)" "Net-(D3-Pad1)" "Net-(C8-Pad1)" "unconnected-(PS1-Pad8)"
+    "Net-(C1-Pad1)" GND1 "Net-(C2-Pad1)" "Net-(C3-Pad1)" GND2 "Net-(C7-Pad1)" "Net-(D1-Pad2)" "Net-(D2-Pad1)"
+    VCC "Net-(J1-PadA5)" "Net-(J1-PadA6)" "Net-(J1-PadA7)" "unconnected-(J1-PadA8)" "Net-(J1-PadB5)" "unconnected-(J1-PadB8)" "unconnected-(J1-PadS1)"
+    "Net-(C6-Pad1)" /TX /IO0 /EN /RX /RTS "Net-(Q1-Pad1)" /DTR
+    "Net-(Q2-Pad1)" /CTS "Net-(R3-Pad1)" "Net-(R4-Pad1)" "Net-(R5-Pad1)" "Net-(R5-Pad2)" "Net-(R6-Pad1)" "Net-(R6-Pad2)"
+    +5V +3.3V "unconnected-(U3-Pad10)" "unconnected-(U3-Pad11)" "unconnected-(U3-Pad12)" "unconnected-(U3-Pad15)" "Net-(D3-Pad1)" "Net-(C8-Pad1)"
+    "unconnected-(PS1-Pad8)"
     (clearance_class default)
     (via_rule default)
     (rule

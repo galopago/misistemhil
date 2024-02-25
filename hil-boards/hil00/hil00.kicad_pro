@@ -333,7 +333,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "burinido.kicad_pro",
+    "filename": "hil00.kicad_pro",
     "version": 1
   },
   "net_settings": {
@@ -366,7 +366,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "specctra_dsn": "burinido.dsn",
+      "specctra_dsn": "hil00.dsn",
       "step": "",
       "vrml": ""
     },
