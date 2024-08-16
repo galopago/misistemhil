@@ -321,7 +321,7 @@
   (gr_line (start 100 100) (end 100 108) (layer "Edge.Cuts") (width 0.1) (tstamp 5d6744c2-284e-4e73-b6df-e0066c716130))
   (gr_line (start 100 108) (end 143 108) (layer "Edge.Cuts") (width 0.1) (tstamp c6222bd5-8b3b-464c-b5fe-b7f85a4b75c6))
   (gr_line (start 143 100) (end 143 108) (layer "Edge.Cuts") (width 0.1) (tstamp ef28cd52-ebd5-4314-9c42-078d35994221))
-  (gr_text "A00_hillabelplate" (at 133.477 106.807) (layer "B.SilkS") (tstamp bec01abc-0672-407c-8728-db9eda1b9b4f)
+  (gr_text "C00_hillabelplate" (at 133.477 106.807) (layer "B.SilkS") (tstamp bec01abc-0672-407c-8728-db9eda1b9b4f)
     (effects (font (size 1 1) (thickness 0.15)) (justify mirror))
   )
 
