@@ -1,4 +1,4 @@
-23042010038798913
+23059724969944525
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -43238,13 +43238,6 @@ lan magnetics transformer
 0
 14
 13
-Connector_RJ_THT
-RJ45_Wayconn_MJEA-881X1XXX_Horizontal
-RJ45 8P8C Socket 90 degrees, https://wayconn.com/wp-content/themes/way/datasheet/MJEA-881X1XXX_PCB_MOUNT_RJ45_JACK_RA.pdf
-RJ45 jack connector 8P8C
-0
-8
-8
 Connector_SATA_SAS
 SAS-mini_TEConnectivity_1888174_Vertical
 36pin mini SAS connector, http://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=1888174&DocType=Customer+Drawing&DocLang=English
@@ -52381,6 +52374,13 @@ muRata MEJ1S DCDC-Converter
 4
 4
 Converter_DCDC_SMD
+Converter_DCDC_Mornsun_B03_XT_1WR3_SMD
+https://www.mornsun-power.com/public/uploads/pdf/B_XT-1WR2.pdf
+DCDC SMD Mornsun B03XT1WR3
+0
+5
+5
+Converter_DCDC_SMD
 Converter_DCDC_Mornsun_B05_XT_1WR3_SMD
 https://mornsun-power.com/html/pdf/B0505XT-1WR3.html
 DCDC SMD Mornsun B05XT1WR3
@@ -53661,13 +53661,6 @@ SMD SMT ceramic resonator filter filter hand-soldering
 0
 3
 3
-Crystal_SMD
-Crystal_SMD_HC49-SD_HandSoldering_Compact
-SMD Crystal HC-49-SD http://cdn-reichelt.de/documents/datenblatt/B400/xxx-HC49-SMD.pdf, hand-soldering, 11.4x4.7mm^2 package
-SMD SMT crystal hand-soldering
-0
-2
-2
 Diode_SMD
 D_0201_0603Metric
 Diode SMD 0201 (0603 Metric), square (rectangular) end terminal, IPC_7351 nominal, (Body size source: https://www.vishay.com/docs/20052/crcw0201e3.pdf), generated with kicad-footprint-generator
@@ -55670,6 +55663,13 @@ One digit LED 7 segment SA39-11 SC39-11 SA39-12 SC39-12
 0
 10
 10
+Display_OLED
+OLED-128x64-I2C
+OLED-128x64-I2C
+OLED-128x64-I2C
+0
+8
+8
 Ferrite_THT
 LairdTech_28C0236-0JW-10
 Ferrite, vertical, LairdTech 28C0236-0JW-10, https://assets.lairdtech.com/home/brandworld/files/28C0236-0JW-10.pdf, JW Miller core https://www.bourns.com/products/magnetic-products/j.w.-miller-through-hole-ferrite-beads-emi-filters
@@ -63689,6 +63689,13 @@ Module
 WEMOS_D1_mini_light
 16-pin module, column spacing 22.86 mm (900 mils), https://wiki.wemos.cc/products:d1:d1_mini, https://c1.staticflickr.com/1/734/31400410271_f278b087db_z.jpg
 ESP8266 WiFi microcontroller
+0
+16
+16
+Module_Espressif
+ESP32 C3 SuperMini
+ESP32 C3 https://www.espboards.dev/esp32/esp32-c3-super-mini/
+ESP32 C3
 0
 16
 16
@@ -89375,6 +89382,69 @@ Dinkle DT-55-B01X Terminal Block  pitch 10.00mm
 0
 30
 30
+TerminalBlock_DoubleLevel
+TerminalBlock_DoubleLevel_2x02_P3.50mm_Horizontal
+Terminal Block Double Level, 4 pins, pitch 3.5mm, size 7.7x7mm^2, drill diamater 1.2mm, pad diameter 2.4mm, see http://www.4uconnector.com/online/object/4udrawing/19963.pdf, script-generated using https://github.com/pointhi/kicad-footprint-generator/scripts/TerminalBlock_4Ucon
+THT Terminal Block Double Level.pitch 3.5mm size 7.7x7mm^2 drill 1.2mm pad 2.4mm
+0
+4
+4
+TerminalBlock_DoubleLevel
+TerminalBlock_DoubleLevel_2x03_P3.50mm_Horizontal
+Terminal Block Double Level, 6 pins, pitch 3.5mm, size 7.7x7mm^2, drill diamater 1.2mm, pad diameter 2.4mm, see http://www.4uconnector.com/online/object/4udrawing/19963.pdf, script-generated using https://github.com/pointhi/kicad-footprint-generator/scripts/TerminalBlock_4Ucon. 3D model placeholder.
+THT Terminal Block Double Level pitch 3.5mm size 7.7x7mm^2 drill 1.2mm pad 2.4mm 2x03 6 pins
+0
+6
+6
+TerminalBlock_DoubleLevel
+TerminalBlock_DoubleLevel_2x04_P3.50mm_Horizontal
+Terminal Block Double Level, 8 pins, pitch 3.5mm, size 7.7x7mm^2, drill diamater 1.2mm, pad diameter 2.4mm, see http://www.4uconnector.com/online/object/4udrawing/19963.pdf, script-generated using https://github.com/pointhi/kicad-footprint-generator/scripts/TerminalBlock_4Ucon. 3D model placeholder.
+THT Terminal Block Double Level pitch 3.5mm size 7.7x7mm^2 drill 1.2mm pad 2.4mm 2x04 8 pins
+0
+8
+8
+TerminalBlock_DoubleLevel
+TerminalBlock_DoubleLevel_2x05_P3.50mm_Horizontal
+Terminal Block Double Level, 10 pins, pitch 3.5mm, size 7.7x7mm^2, drill diamater 1.2mm, pad diameter 2.4mm, see http://www.4uconnector.com/online/object/4udrawing/19963.pdf, script-generated using https://github.com/pointhi/kicad-footprint-generator/scripts/TerminalBlock_4Ucon. 3D model placeholder.
+THT Terminal Block Double Level pitch 3.5mm size 7.7x7mm^2 drill 1.2mm pad 2.4mm 2x05 10 pins
+0
+10
+10
+TerminalBlock_DoubleLevel
+TerminalBlock_DoubleLevel_2x06_P3.50mm_Horizontal
+Terminal Block Double Level, 12 pins, pitch 3.5mm, size 7.7x7mm^2, drill diamater 1.2mm, pad diameter 2.4mm, see http://www.4uconnector.com/online/object/4udrawing/19963.pdf, script-generated using https://github.com/pointhi/kicad-footprint-generator/scripts/TerminalBlock_4Ucon. 3D model placeholder.
+THT Terminal Block Double Level pitch 3.5mm size 7.7x7mm^2 drill 1.2mm pad 2.4mm 2x06 12 pins
+0
+12
+12
+TerminalBlock_DoubleLevel
+TerminalBlock_DoubleLevel_2x07_P3.50mm_Horizontal
+Terminal Block Double Level, 14 pins, pitch 3.5mm, size 7.7x7mm^2, drill diamater 1.2mm, pad diameter 2.4mm, see http://www.4uconnector.com/online/object/4udrawing/19963.pdf, script-generated using https://github.com/pointhi/kicad-footprint-generator/scripts/TerminalBlock_4Ucon. 3D model placeholder.
+THT Terminal Block Double Level pitch 3.5mm size 7.7x7mm^2 drill 1.2mm pad 2.4mm 2x07 14 pins
+0
+14
+14
+TerminalBlock_DoubleLevel
+TerminalBlock_DoubleLevel_2x08_P3.50mm_Horizontal
+Terminal Block Double Level, 16 pins, pitch 3.5mm, size 7.7x7mm^2, drill diamater 1.2mm, pad diameter 2.4mm, see http://www.4uconnector.com/online/object/4udrawing/19963.pdf, script-generated using https://github.com/pointhi/kicad-footprint-generator/scripts/TerminalBlock_4Ucon. 3D model placeholder.
+THT Terminal Block Double Level pitch 3.5mm size 7.7x7mm^2 drill 1.2mm pad 2.4mm 2x08 16 pins
+0
+16
+16
+TerminalBlock_DoubleLevel
+TerminalBlock_DoubleLevel_2x09_P3.50mm_Horizontal
+Terminal Block Double Level, 18 pins, pitch 3.5mm, size 7.7x7mm^2, drill diamater 1.2mm, pad diameter 2.4mm, see http://www.4uconnector.com/online/object/4udrawing/19963.pdf, script-generated using https://github.com/pointhi/kicad-footprint-generator/scripts/TerminalBlock_4Ucon. 3D model placeholder.
+THT Terminal Block Double Level pitch 3.5mm size 7.7x7mm^2 drill 1.2mm pad 2.4mm 2x09 18 pins
+0
+18
+18
+TerminalBlock_DoubleLevel
+TerminalBlock_DoubleLevel_2x10_P3.50mm_Horizontal
+Terminal Block Double Level, 20 pins, pitch 3.5mm, size 7.7x7mm^2, drill diamater 1.2mm, pad diameter 2.4mm, see http://www.4uconnector.com/online/object/4udrawing/19963.pdf, script-generated using https://github.com/pointhi/kicad-footprint-generator/scripts/TerminalBlock_4Ucon. 3D model placeholder.
+THT Terminal Block Double Level pitch 3.5mm size 7.7x7mm^2 drill 1.2mm pad 2.4mm 2x10 20 pins
+0
+20
+20
 TerminalBlock_MetzConnect
 TerminalBlock_MetzConnect_360271_1x01_Horizontal_ScrewM3.0_Boxed
 single screw terminal block Metz Connect 360271, block size 9x7.3mm^2, drill diamater 1.5mm, 1 pads, pad diameter 3mm, see http://www.metz-connect.com/de/system/files/METZ_CONNECT_U_Contact_Katalog_Anschlusssysteme_fuer_Leiterplatten_DE_31_07_2017_OFF_024803.pdf?language=en page 134, script-generated using https://github.com/pointhi/kicad-footprint-generator/scripts/TerminalBlock_MetzConnect
