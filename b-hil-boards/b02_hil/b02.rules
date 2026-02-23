@@ -1,0 +1,85 @@
+
+(rules PCB b02.dsn
+  (snap_angle 
+    fortyfive_degree
+  )
+  (autoroute_settings
+    (fanout off)
+    (autoroute on)
+    (postroute off)
+    (vias on)
+    (via_costs 50)
+    (plane_via_costs 5)
+    (start_ripup_costs 100)
+    (start_pass_no 1)
+    (layer_rule F.Cu
+      (active on)
+      (preferred_direction horizontal)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 4.5)
+    )
+    (layer_rule B.Cu
+      (active on)
+      (preferred_direction vertical)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 3.0)
+    )
+  )
+  (rule
+    (width 200.0)
+    (clearance 200.2)
+    (clearance 100.0 (type smd_to_turn_gap))
+    (clearance 50.0 (type smd))
+    (clearance 200.2 (type "kicad_default"))
+  )
+  (padstack "Via[0-1]_600:300_um"
+    (shape
+      (circle F.Cu 600.0 0.0 0.0)
+    )
+    (shape
+      (circle B.Cu 600.0 0.0 0.0)
+    )
+    (attach off)
+  )
+  (via 
+    "Via[0-1]_600:300_um" "Via[0-1]_600:300_um" default
+  )
+  (via 
+    "Via[0-1]_600:300_um-kicad_default" "Via[0-1]_600:300_um" "kicad_default"
+  )
+  (via_rule
+    default "Via[0-1]_600:300_um"
+  )
+  (via_rule
+    "kicad_default" "Via[0-1]_600:300_um-kicad_default"
+  )
+  (class default
+    (clearance_class default)
+    (via_rule default)
+    (rule
+      (width 200.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class "kicad_default"
+    "/UART1_TTL_TX" "/UART1_TTL_RX" "/TTL_AUX_IN" +3.3V "unconnected-(U3-CTRL1-Pad7)" "unconnected-(U3-CTRL2-Pad10)" "unconnected-(PS1-NC-Pad8)" "/UART1_RX_MUX"
+    "/UART1_485_RX" "/UART1_TX_MUX" "/UART1_485_TX" GND2 +3V3 "Net-(U1-DE)" "unconnected-(U2-I5-Pad5)" "unconnected-(U2-I6-Pad6)"
+    "unconnected-(U2-I7-Pad7)" "unconnected-(U2-O7-Pad10)" "unconnected-(U2-O6-Pad11)" "unconnected-(U2-O5-Pad12)" "unconnected-(U4-GPIO2-Pad11)" "unconnected-(U4-3V3-Pad14)" GND1 "Net-(U2-O1)"
+    "Net-(K2-Pad14)" "Net-(K2-Pad24)" "Net-(K3-Pad24)" "Net-(K4-Pad24)" "unconnected-(K3-Pad22)" "unconnected-(K3-Pad14)" "unconnected-(K3-Pad11)" "unconnected-(K3-Pad12)"
+    "unconnected-(K4-Pad22)" "unconnected-(K4-Pad14)" "unconnected-(K4-Pad11)" "unconnected-(K4-Pad12)" "Net-(U2-O4)" "Net-(U2-O3)" "Net-(U2-O2)" "Net-(U3-VOA)"
+    "Net-(U3-VOB)" "Net-(U3-VIC)" "Net-(U3-VID)" "unconnected-(K2-Pad22)" "unconnected-(K2-Pad12)" "/R_PU" "/R_PD" +5V
+    "Net-(U5-SCL)" "Net-(U5-SDA)" "Net-(D1-A)" "Net-(D2-A)" "Net-(R11-Pad1)" "Net-(R13-Pad1)" /RX /DEFAULTS
+    /TX "/DISP_SCL" "/DISP_SDA" "Net-(D3-A)" "/ERR_LED_EXT" "/ERR_LED" "/TX_LED_EXT" "/RX_LED_EXT"
+    "Net-(U2-I1)" "Net-(U2-I2)" "Net-(U2-I3)" "Net-(U2-I4)" "/485_CTR" "/TTL_IN"
+    (clearance_class "kicad_default")
+    (via_rule "kicad_default")
+    (rule
+      (width 200.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+)
