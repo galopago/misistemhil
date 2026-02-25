@@ -1,0 +1,6 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "Converter_DCDC_SMD")(type "KiCad")(uri "${KIPRJMOD}/library/Converter_DCDC_SMD.kicad_sym")(options "")(descr ""))
+  (lib (name "MCU_Espressif_DIL_modules")(type "KiCad")(uri "${KIPRJMOD}/library/MCU_Espressif_DIL_modules.kicad_sym")(options "")(descr ""))
+  (lib (name "Display_OLED")(type "KiCad")(uri "${KIPRJMOD}/library/Display_OLED.kicad_sym")(options "")(descr ""))
+)
