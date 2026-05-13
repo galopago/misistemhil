@@ -1,0 +1,82 @@
+
+(rules PCB b02
+  (snap_angle 
+    fortyfive_degree
+  )
+  (autoroute_settings
+    (fanout off)
+    (autoroute on)
+    (postroute on)
+    (vias on)
+    (via_costs 50)
+    (plane_via_costs 5)
+    (start_ripup_costs 100)
+    (start_pass_no 3312)
+    (layer_rule F.Cu
+      (active on)
+      (preferred_direction horizontal)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 3.0)
+    )
+    (layer_rule B.Cu
+      (active on)
+      (preferred_direction vertical)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 1.5)
+    )
+  )
+  (rule
+    (width 200.0)
+    (clear 200.0)
+    (clear 100.0 (type smd_to_turn_gap))
+    (clear 50.0 (type smd-smd))
+  )
+  (padstack "Via[0-1]_600:300_um"
+    (shape
+      (circle F.Cu 600.0 0.0 0.0)
+    )
+    (shape
+      (circle B.Cu 600.0 0.0 0.0)
+    )
+    (attach off)
+  )
+  (via 
+    "Via[0-1]_600:300_um" "Via[0-1]_600:300_um" default
+  )
+  (via 
+    "Via[0-1]_600:300_um-kicad_default" "Via[0-1]_600:300_um" "kicad_default"
+  )
+  (via_rule
+    default "Via[0-1]_600:300_um"
+  )
+  (via_rule
+    "kicad_default" "Via[0-1]_600:300_um-kicad_default"
+  )
+  (class default
+    (clearance_class default)
+    (via_rule default)
+    (rule
+      (width 200.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class "kicad_default"
+    "/BUS_IN_0" "/BUS_IN_1" "/BUS_IN_2" +3.3V "unconnected-(PS1-NC-Pad8)" "/BUS_IN_3" "Net-(U1-VIA)" GND2
+    +3V3 "unconnected-(U4-GPIO2-Pad11)" "unconnected-(U4-3V3-Pad14)" GND1 "Net-(R2-Pad1)" "Net-(U1-VIB)" "Net-(R3-Pad1)" "Net-(U1-VIC)"
+    "Net-(R4-Pad1)" "Net-(U1-VID)" "Net-(R5-Pad1)" "unconnected-(U1-NC-Pad7)" "unconnected-(U1-VE2-Pad10)" "unconnected-(U4-GPIO9-Pad5)" +5V "Net-(U5-SCL)"
+    "Net-(U5-SDA)" /DEFAULTS "/DISP_SCL" "/DISP_SDA" "Net-(D3-K)" "/ERR_LED_EXT" "/ERR_LED" "unconnected-(J2-Pin_6-Pad6)"
+    "unconnected-(U4-GPIO5-Pad1)" "unconnected-(U4-GPIO6-Pad2)" "unconnected-(U4-GPIO10-Pad6)" "unconnected-(U6-3V3-Pad3)" "Net-(U6-GPIO8)" "Net-(U6-GPIO7)" "Net-(U6-GPIO6)" "Net-(U6-GPIO5)"
+    "Net-(U6-GPIO4)" "Net-(U6-GPIO3)" "unconnected-(U6-GPIO2-Pad16)" "/BUS_3" "/BUS_2" "/BUS_1" "/BUS_0" "Net-(U6-GPIO0)"
+    "/COMM_0" "Net-(U6-GPIO1)" "/COMM_1" "/COMM_2" "Net-(U6-GPIO14)" "/COMM_3" "Net-(U6-GPIO15)"
+    (clearance_class "kicad_default")
+    (via_rule "kicad_default")
+    (rule
+      (width 200.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+)
