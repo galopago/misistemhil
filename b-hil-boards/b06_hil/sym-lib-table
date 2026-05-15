@@ -4,4 +4,5 @@
   (lib (name "MCU_Espressif_DIL_modules")(type "KiCad")(uri "${KIPRJMOD}/library/MCU_Espressif_DIL_modules.kicad_sym")(options "")(descr ""))
   (lib (name "Display_OLED")(type "KiCad")(uri "${KIPRJMOD}/library/Display_OLED.kicad_sym")(options "")(descr ""))
   (lib (name "MCU_Raspberrypi_DIL_modules")(type "KiCad")(uri "${KIPRJMOD}/library/MCU_Raspberrypi_DIL_modules.kicad_sym")(options "")(descr ""))
+  (lib (name "Connector_Improved")(type "KiCad")(uri "${KIPRJMOD}/library/Connector_Improved.kicad_sym")(options "")(descr ""))
 )

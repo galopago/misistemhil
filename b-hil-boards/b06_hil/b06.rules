@@ -1,0 +1,100 @@
+
+(rules PCB b06.dsn
+  (snap_angle 
+    fortyfive_degree
+  )
+  (autoroute_settings
+    (fanout off)
+    (autoroute on)
+    (postroute off)
+    (vias on)
+    (via_costs 50)
+    (plane_via_costs 5)
+    (start_ripup_costs 100)
+    (start_pass_no 1)
+    (layer_rule F.Cu
+      (active on)
+      (preferred_direction horizontal)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 4.5)
+    )
+    (layer_rule B.Cu
+      (active on)
+      (preferred_direction vertical)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 3.0)
+    )
+  )
+  (rule
+    (width 200.0)
+    (clearance 200.2)
+    (clearance 100.0 (type smd_to_turn_gap))
+    (clearance 50.0 (type smd))
+    (clearance 200.2 (type "kicad_default"))
+    (clearance 200.2 (type "5V Power"))
+  )
+  (padstack "Via[0-1]_600:300_um"
+    (shape
+      (circle F.Cu 600.0 0.0 0.0)
+    )
+    (shape
+      (circle B.Cu 600.0 0.0 0.0)
+    )
+    (attach off)
+  )
+  (via 
+    "Via[0-1]_600:300_um" "Via[0-1]_600:300_um" default
+  )
+  (via 
+    "Via[0-1]_600:300_um-kicad_default" "Via[0-1]_600:300_um" "kicad_default"
+  )
+  (via 
+    "Via[0-1]_600:300_um-5V Power" "Via[0-1]_600:300_um" "5V Power"
+  )
+  (via_rule
+    default "Via[0-1]_600:300_um"
+  )
+  (via_rule
+    "kicad_default" "Via[0-1]_600:300_um-kicad_default"
+  )
+  (via_rule
+    "5V Power" "Via[0-1]_600:300_um-5V Power"
+  )
+  (class default
+    (clearance_class default)
+    (via_rule default)
+    (rule
+      (width 200.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class "kicad_default"
+    +3V3 "unconnected-(U4-GPIO2-Pad11)" GND "unconnected-(U4-GPIO9-Pad5)" "Net-(U5-SCL)" "Net-(U5-SDA)" /DEFAULTS "/DISP_SCL"
+    "/DISP_SDA" "Net-(D3-K)" "/ERR_LED_EXT" "/ERR_LED" "unconnected-(U4-GPIO5-Pad1)" "unconnected-(U4-GPIO6-Pad2)" "unconnected-(U4-GPIO10-Pad6)" "Net-(J3-CC1)"
+    "Net-(J3-CC2)" "unconnected-(U4-GPIO20-Pad7)" "unconnected-(U4-GPIO21-Pad8)" "unconnected-(U4-GPIO3-Pad12)" "unconnected-(U4-GPIO4-Pad13)" "unconnected-(J3-SHIELD-PadS1)" "Net-(D1-A)" "unconnected-(J2-CC1-PadA5)"
+    "unconnected-(J2-CC2-PadB5)" "unconnected-(J2-SHIELD-PadS1)" "Net-(D2-A)" "unconnected-(J4-CC1-PadA5)" "unconnected-(J4-CC2-PadB5)" "unconnected-(J4-SHIELD-PadS1)" "Net-(D4-A)" "unconnected-(J5-CC1-PadA5)"
+    "unconnected-(J5-CC2-PadB5)" "unconnected-(J5-SHIELD-PadS1)" "Net-(U1-IN-)" +3.3V "Net-(U1-IN+)" "/OUT_PW_LED1" "Net-(U2-IN+)" "Net-(U2-IN-)"
+    "/OUT_PW_LED2" "Net-(U3-IN-)" "Net-(U3-IN+)" "/OUT_PW_LED3"
+    (clearance_class "kicad_default")
+    (via_rule "kicad_default")
+    (rule
+      (width 200.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class "5V Power"
+    +5V
+    (clearance_class "5V Power")
+    (via_rule "5V Power")
+    (rule
+      (width 500.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+)

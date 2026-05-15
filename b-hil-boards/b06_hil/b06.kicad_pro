@@ -48,7 +48,13 @@
           "min_clearance": 0.0
         }
       },
-      "diff_pair_dimensions": [],
+      "diff_pair_dimensions": [
+        {
+          "gap": 0.0,
+          "via_gap": 0.0,
+          "width": 0.0
+        }
+      ],
       "drc_exclusions": [],
       "meta": {
         "version": 2
@@ -163,8 +169,20 @@
           "td_width_to_size_filter_ratio": 0.9
         }
       ],
-      "track_widths": [],
-      "via_dimensions": [],
+      "track_widths": [
+        0.0,
+        0.5
+      ],
+      "via_dimensions": [
+        {
+          "diameter": 0.0,
+          "drill": 0.0
+        },
+        {
+          "diameter": 0.6,
+          "drill": 0.3
+        }
+      ],
       "zones_allow_external_fillets": false
     },
     "layer_presets": [],
@@ -390,7 +408,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "b02.kicad_pro",
+    "filename": "b06.kicad_pro",
     "version": 1
   },
   "net_settings": {
@@ -411,6 +429,23 @@
         "via_diameter": 0.6,
         "via_drill": 0.3,
         "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "5V Power",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.5,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
       }
     ],
     "meta": {
@@ -418,14 +453,43 @@
     },
     "net_colors": null,
     "netclass_assignments": null,
-    "netclass_patterns": []
+    "netclass_patterns": [
+      {
+        "netclass": "5V Power",
+        "pattern": "+5V"
+      },
+      {
+        "netclass": "5V Power",
+        "pattern": "Net-(U1-IN+)"
+      },
+      {
+        "netclass": "Default",
+        "pattern": "Net-(U1-IN-)"
+      },
+      {
+        "netclass": "5V Power",
+        "pattern": "Net-(U2-IN+)"
+      },
+      {
+        "netclass": "Default",
+        "pattern": "Net-(U2-IN-)"
+      },
+      {
+        "netclass": "5V Power",
+        "pattern": "Net-(U3-IN+)"
+      },
+      {
+        "netclass": "Default",
+        "pattern": "Net-(U3-IN-)"
+      }
+    ]
   },
   "pcbnew": {
     "last_paths": {
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "specctra_dsn": "b02.dsn",
+      "specctra_dsn": "b06.dsn",
       "step": "",
       "vrml": ""
     },
