@@ -2574,7 +2574,7 @@
   (symbol (lib_id "Connector:Conn_01x14_Socket") (at 255.27 66.04 0) (mirror x) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 3bfb6944-f1c6-45af-9f9f-12bb81cbeade)
-    (property "Reference" "J6" (at 256.54 66.04 0)
+    (property "Reference" "J5" (at 256.54 66.04 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Value" "Conn_01x14_Socket" (at 256.54 63.5 0)
@@ -2603,7 +2603,7 @@
     (instances
       (project "b06"
         (path "/f3c2aef5-4f0e-4b7a-b0f6-d797c84c763a"
-          (reference "J6") (unit 1)
+          (reference "J5") (unit 1)
         )
       )
     )
@@ -2728,7 +2728,7 @@
   (symbol (lib_name "USB_C_Receptacle_PowerOnly_6P_Improved_1") (lib_id "Connector_Improved:USB_C_Receptacle_PowerOnly_6P_Improved") (at 29.21 172.72 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 483340eb-4d49-4ca6-8c98-7432e9520531)
-    (property "Reference" "J3" (at 29.21 154.94 0)
+    (property "Reference" "J1" (at 29.21 154.94 0)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "USB_C_Receptacle_PowerOnly_6P_Improved" (at 33.02 157.48 0)
@@ -2754,7 +2754,7 @@
     (instances
       (project "b06"
         (path "/f3c2aef5-4f0e-4b7a-b0f6-d797c84c763a"
-          (reference "J3") (unit 1)
+          (reference "J1") (unit 1)
         )
       )
     )
@@ -2972,7 +2972,7 @@
   (symbol (lib_name "USB_C_Receptacle_PowerOnly_6P_Improved_1") (lib_id "Connector_Improved:USB_C_Receptacle_PowerOnly_6P_Improved") (at 30.48 31.75 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 6d5c071f-1bf3-4ac9-8fdf-68044722e726)
-    (property "Reference" "J2" (at 30.48 13.97 0)
+    (property "Reference" "J4" (at 30.48 13.97 0)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "USB_C_Receptacle_PowerOnly_6P_Improved" (at 33.02 16.51 0)
@@ -2998,7 +2998,7 @@
     (instances
       (project "b06"
         (path "/f3c2aef5-4f0e-4b7a-b0f6-d797c84c763a"
-          (reference "J2") (unit 1)
+          (reference "J4") (unit 1)
         )
       )
     )
@@ -3134,7 +3134,7 @@
   (symbol (lib_name "USB_C_Receptacle_PowerOnly_6P_Improved_1") (lib_id "Connector_Improved:USB_C_Receptacle_PowerOnly_6P_Improved") (at 30.48 125.73 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 765458ae-2125-49e7-a67f-8639a393e845)
-    (property "Reference" "J5" (at 30.48 107.95 0)
+    (property "Reference" "J2" (at 30.48 107.95 0)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "USB_C_Receptacle_PowerOnly_6P_Improved" (at 33.02 110.49 0)
@@ -3160,7 +3160,7 @@
     (instances
       (project "b06"
         (path "/f3c2aef5-4f0e-4b7a-b0f6-d797c84c763a"
-          (reference "J5") (unit 1)
+          (reference "J2") (unit 1)
         )
       )
     )
@@ -3220,7 +3220,7 @@
   (symbol (lib_name "USB_C_Receptacle_PowerOnly_6P_Improved_1") (lib_id "Connector_Improved:USB_C_Receptacle_PowerOnly_6P_Improved") (at 30.48 78.74 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid 786ee27d-4aee-410b-ade5-1008b5cd2baa)
-    (property "Reference" "J4" (at 30.48 60.96 0)
+    (property "Reference" "J3" (at 30.48 60.96 0)
       (effects (font (size 1.27 1.27)))
     )
     (property "Value" "USB_C_Receptacle_PowerOnly_6P_Improved" (at 33.02 63.5 0)
@@ -3246,7 +3246,7 @@
     (instances
       (project "b06"
         (path "/f3c2aef5-4f0e-4b7a-b0f6-d797c84c763a"
-          (reference "J4") (unit 1)
+          (reference "J3") (unit 1)
         )
       )
     )
