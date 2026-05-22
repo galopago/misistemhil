@@ -3274,9 +3274,9 @@
       (stroke (width 0.1) (type solid)) (layer "F.Fab") (tstamp ba9c03ff-5a06-43fa-906b-e50d8390c8ac))
     (fp_line (start 1 0.625) (end -1 0.625)
       (stroke (width 0.1) (type solid)) (layer "F.Fab") (tstamp 93799328-c72c-4027-9199-35173e7edc86))
-    (pad "1" smd roundrect (at -1.0375 0 180) (size 1.175 1.45) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.212766)
+    (pad "1" smd roundrect (at -1.0375 0 180) (size 1.175 1.45) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.2127659574)
       (net 2 "+3V3") (pintype "passive") (tstamp d7c144cc-6cd4-4f40-80e1-5faae0116649))
-    (pad "2" smd roundrect (at 1.0375 0 180) (size 1.175 1.45) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.212766)
+    (pad "2" smd roundrect (at 1.0375 0 180) (size 1.175 1.45) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.2127659574)
       (net 1 "GND") (pintype "passive") (tstamp 72960be7-f949-4f81-91e7-4a5b44778bc7))
     (model "${KICAD6_3DMODEL_DIR}/Capacitor_SMD.3dshapes/C_0805_2012Metric.wrl"
       (offset (xyz 0 0 0))
@@ -3353,9 +3353,9 @@
       (stroke (width 0.1) (type solid)) (layer "F.Fab") (tstamp c6a8339f-e3e7-4340-a067-8c107bd8c00b))
     (fp_line (start 1 0.625) (end -1 0.625)
       (stroke (width 0.1) (type solid)) (layer "F.Fab") (tstamp a4b5bfa1-8115-4519-8668-21206e159688))
-    (pad "1" smd roundrect (at -1 0) (size 1.2 1.4) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.208333)
+    (pad "1" smd roundrect (at -1 0) (size 1.2 1.4) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.2083333333)
       (net 2 "+3V3") (pintype "passive") (tstamp 7652628a-b33b-4855-9449-41ce71c0063b))
-    (pad "2" smd roundrect (at 1 0) (size 1.2 1.4) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.208333)
+    (pad "2" smd roundrect (at 1 0) (size 1.2 1.4) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.2083333333)
       (net 70 "/{slash}KOE") (pintype "passive") (tstamp 385477c7-4189-4b03-8295-684226c66a6f))
     (model "${KICAD6_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0805_2012Metric.wrl"
       (offset (xyz 0 0 0))
