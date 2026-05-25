@@ -66,13 +66,14 @@
   (class "kicad_default"
     "/UART1_TTL_TX" "/UART1_TTL_RX" "/TTL_AUX_IN" +3.3V "unconnected-(U3-CTRL1-Pad7)" "unconnected-(U3-CTRL2-Pad10)" "unconnected-(PS1-NC-Pad8)" "/UART1_RX_MUX"
     "/UART1_485_RX" "/UART1_TX_MUX" "/UART1_485_TX" GND2 +3V3 "Net-(U1-DE)" "unconnected-(U2-I5-Pad5)" "unconnected-(U2-I6-Pad6)"
-    "unconnected-(U2-I7-Pad7)" "unconnected-(U2-O7-Pad10)" "unconnected-(U2-O6-Pad11)" "unconnected-(U2-O5-Pad12)" "unconnected-(U4-GPIO2-Pad11)" "unconnected-(U4-3V3-Pad14)" GND1 "Net-(U2-O1)"
+    "unconnected-(U2-I7-Pad7)" "unconnected-(U2-O7-Pad10)" "unconnected-(U2-O6-Pad11)" "unconnected-(U2-O5-Pad12)" "/485_DRV" "unconnected-(U4-3V3-Pad14)" GND1 "Net-(U2-O1)"
     "Net-(K2-Pad14)" "Net-(K2-Pad24)" "Net-(K3-Pad24)" "Net-(K4-Pad24)" "unconnected-(K3-Pad22)" "unconnected-(K3-Pad14)" "unconnected-(K3-Pad11)" "unconnected-(K3-Pad12)"
     "unconnected-(K4-Pad22)" "unconnected-(K4-Pad14)" "unconnected-(K4-Pad11)" "unconnected-(K4-Pad12)" "Net-(U2-O4)" "Net-(U2-O3)" "Net-(U2-O2)" "Net-(U3-VOA)"
     "Net-(U3-VOB)" "Net-(U3-VIC)" "Net-(U3-VID)" "unconnected-(K2-Pad22)" "unconnected-(K2-Pad12)" "/R_PU" "/R_PD" +5V
-    "Net-(U5-SCL)" "Net-(U5-SDA)" "Net-(D1-A)" "Net-(D2-A)" "Net-(R11-Pad1)" "Net-(R13-Pad1)" /RX /DEFAULTS
-    /TX "/DISP_SCL" "/DISP_SDA" "Net-(D3-A)" "/ERR_LED_EXT" "/ERR_LED" "/TX_LED_EXT" "/RX_LED_EXT"
-    "Net-(U2-I1)" "Net-(U2-I2)" "Net-(U2-I3)" "Net-(U2-I4)" "/485_CTR" "/TTL_IN"
+    "Net-(U5-SCL)" "Net-(U5-SDA)" "Net-(D1-K)" "Net-(D2-K)" "Net-(R11-Pad1)" "Net-(R13-Pad1)" /RX /DEFAULTS
+    /TX "/DISP_SCL" "/DISP_SDA" "Net-(D3-K)" "/ERR_LED_EXT" "/ERR_LED" "/TX_LED_EXT" "/RX_LED_EXT"
+    "Net-(U2-I1)" "Net-(U2-I2)" "Net-(U2-I3)" "Net-(U2-I4)" "/485_CTR" "/TTL_IN" /{slash}KOE "Net-(U4-GPIO9)"
+    "Net-(U4-GPIO21)" "Net-(U4-GPIO3)" "Net-(U4-GPIO4)" "unconnected-(U8-Y7-Pad11)" "unconnected-(U8-Y6-Pad12)" "unconnected-(U8-Y5-Pad13)"
     (clearance_class "kicad_default")
     (via_rule "kicad_default")
     (rule
