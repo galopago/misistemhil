@@ -3,13 +3,29 @@
 All agentic development methodology documentation in this firmware tree is
 maintained in English.
 
+Before starting any task in this file, run the **Role Boundary Check**:
+
+- Read `ROLE.md` in this folder, `../../AGENTS.md`, and `../../docs/methodology.md`.
+- Confirm the request is **architecture and documentation**, not firmware
+  implementation, builds, or formal validation.
+- If the task includes code, tests, or flash steps, stop and tell the human that
+  the implementer or tester must execute those parts unless explicitly
+  redirected.
+
 ## Current Status
 
-Active handoff: `OLED_TEXT_DISPLAY_INTERFACE`.
+Active handoffs:
 
-The implementer must not enable physical I2C OLED communication until display
-pins, address, and driver selection are confirmed against the schematic and
-recorded in the relevant board documentation.
+- `OLED_TEXT_DISPLAY_INTERFACE`
+- `I2C_BUS_ARCHITECTURE`
+- `I2C_BUS_CONCURRENCY`
+
+I2C pins, OLED address candidates, `INA219` addresses, error LED polarity, and
+factory reset switch polarity are recorded in
+`docs/esp32_c3_supermini_connections.md`. Generic shared I2C bus structure and
+incremental concurrency phases are recorded in
+`docs/i2c_bus_architecture.md`. The implementer must still keep physical OLED
+driver/controller selection isolated until confirmed.
 
 ## OLED_TEXT_DISPLAY_INTERFACE
 
@@ -28,7 +44,9 @@ Authorized files:
   - components/app_core/ only for connecting DisplayController ownership if
     required by the implementation.
   - components/board/ only for isolated board configuration placeholders; do not
-    enable pins without schematic confirmation.
+    bypass `docs/esp32_c3_supermini_connections.md` values.
+  - docs/esp32_c3_supermini_connections.md for the board electrical connection
+    map.
   - tests/ for host or component tests.
   - agent-workspaces/implementer/ for implementation notes.
 Expected changes:
@@ -55,6 +73,8 @@ Module boundaries and contracts:
     refreshes only when needed or forced.
 Detailed behavior:
   - Follow `docs/oled_text_display_interface.md` as the normative source.
+  - Follow `docs/esp32_c3_supermini_connections.md` for board-level electrical
+    pins, I2C addresses, and active-low signal polarities.
   - The base display size is exactly 128x64.
   - Layouts are runtime data composed of explicit rectangular regions.
   - Text supports printable ASCII only, controlled truncation without ellipsis,
@@ -68,8 +88,8 @@ Non-goals:
   - Do not implement icons, gauges, cursors, arbitrary bitmaps, widgets, Micro
     QR, Data Matrix, Aztec, scrolling text, animations, power management, or a
     platform-specific public visual contract.
-  - Do not enable electrical I2C bus configuration or physical OLED updates
-    until hardware details are confirmed.
+  - Do not let GPIO numbers or I2C addresses leak into renderer, canvas, visual
+    state, or DisplayController logic.
 Acceptance criteria:
   - The implementation follows the canonical data schema and rendering
     algorithms.
@@ -88,22 +108,164 @@ Constraints:
   - The physical display must be treated as 128x64 only in the base version.
   - The public display API must accept visual states or layouts, not arbitrary
     pixel drawing from application modules.
+  - Board configuration must use `GPIO0` for SCL, `GPIO1` for SDA, `GPIO8` as an
+    active-low error LED, and `GPIO7` as an active-low factory reset switch.
+  - The shared I2C bus must reserve `INA219` addresses `0x40`, `0x41`, and
+    `0x42`, and allow OLED address `0x3C` or `0x3D`.
+  - ESP-IDF is installed on the development computer, but global ESP-IDF
+    environment variables are not created and must not be required by committed
+    code, scripts, or documentation.
+  - Local absolute ESP-IDF tool paths may be discovered and used only while
+    running commands on the workstation; those paths must not be written to any
+    file intended for the repository.
 Validation plan:
   - Add host or component tests for geometry, clipping, layout switching,
     truncation, sanitization, inverted rendering, draw order, refresh policy, and
     QR fit behavior as described in `docs/test_strategy.md`.
-  - Run `idf.py build` after implementation.
-  - Add hardware tests only after pins, address, and driver selection are
+  - Run the build using the locally installed ESP-IDF tools without committing
+    workstation-specific absolute paths or generated environment files.
+  - Add hardware tests only after physical OLED driver/controller selection is
     confirmed.
 Open questions:
-  - Confirm ESP32-C3 SuperMini pins for I2C OLED.
-  - Confirm display I2C address and physical controller/driver.
+  - Confirm physical OLED controller/driver.
   - Confirm QR encoder dependency that fits firmware footprint and licensing.
+```
+
+## I2C_BUS_ARCHITECTURE
+
+```text
+ID: I2C_BUS_ARCHITECTURE
+Objective:
+  Define and implement a portable shared I2C bus layer so multiple device
+  drivers can share one master bus with deterministic structure and behavior.
+Reason:
+  b06_hil shares one I2C bus between OLED and three INA219 devices, but the
+  same bus layer must port to other MCUs and to display-only projects.
+Authorized files:
+  - components/i2c_bus/
+  - components/board/ for board_i2c_bus_config()
+  - components/app_core/ for startup orchestration
+  - components/display/display_driver.* and display_types.h for hardware handle
+    injection at the driver boundary only
+  - docs/i2c_bus_architecture.md
+  - docs/architecture.md
+  - agent-workspaces/implementer/ for implementation notes
+Expected changes:
+  - Implement the portable public contract in docs/i2c_bus_architecture.md.
+  - Keep SDK-specific code inside i2c_bus platform port only.
+  - Add board helper that maps board pins to i2c_bus_config_t.
+  - Initialize the bus in app_core before display startup.
+  - Resolve OLED address using board constants and probe policy 0x3C then 0x3D.
+  - Pass i2c_bus_device_t through display_config_t to display_driver only.
+Module boundaries and contracts:
+  - Follow the three-layer model: board config, portable i2c_bus, platform port.
+  - i2c_bus owns one master bus and cached device handles by address.
+  - board owns GPIO numbers and expected addresses for the target PCB.
+  - display_driver is the only display layer that consumes the I2C device handle.
+  - ina219 remains an optional future component; do not require it in app_core.
+Detailed behavior:
+  - Follow docs/i2c_bus_architecture.md as the normative source.
+  - Use fixed component layout, constants, state machine, and caching rules from
+    that document without reinterpretation.
+  - Bind to ESP-IDF 5.x driver/i2c_master.h in the current target profile.
+  - i2c_bus_add_device() returns the same handle for repeated address requests.
+  - app_core follows the canonical startup order and OLED address policy.
+  - Missing OLED at boot must not crash firmware; stub display may continue.
+Non-goals:
+  - SSD1306/SH1106 frame transmission.
+  - Functional INA219 driver implementation.
+  - 10-bit I2C, multiple buses, broker, or observability beyond the active
+    authorized phase handoff.
+Acceptance criteria:
+  - components/i2c_bus matches fixed layout and portable contract.
+  - Behavior matches canonical algorithms in docs/i2c_bus_architecture.md.
+  - board remains the source of GPIO and expected addresses.
+  - app_core initializes the bus before display_start().
+  - display_config_t carries i2c_bus_device_t without exposing I2C to renderer or
+    controller code.
+  - A display-only project reuses i2c_bus unchanged.
+  - Another LLM implementer can produce substantially similar code from the doc.
+Constraints:
+  - Do not write workstation-specific ESP-IDF absolute paths into committed
+    files.
+  - INA219 addresses 0x40, 0x41, and 0x42 remain board constants for b06_hil.
+  - Public headers must not spread SDK driver types beyond opaque i2c_bus_device_t
+    except project-wide status aliases such as esp_err_t.
+Validation plan:
+  - Run idf.py build after implementation using locally discovered ESP-IDF
+    tools without committing workstation paths.
+  - Add hardware bus tests only after physical OLED driver selection is
+    confirmed.
+Open questions:
+  - None for bus structure. Physical OLED controller/driver remains open under
+    OLED_TEXT_DISPLAY_INTERFACE.
+```
+
+## I2C_BUS_CONCURRENCY
+
+```text
+ID: I2C_BUS_CONCURRENCY
+Objective:
+  Define an incremental concurrency architecture for shared I2C access so
+  multiple application tasks can grow onto the same bus without redesigning
+  device drivers.
+Reason:
+  b06_hil will share one I2C bus between OLED refresh traffic and three INA219
+  sensors. Physical driver serialization alone is not enough once multiple tasks
+  perform concurrent I2C work.
+Authorized files:
+  - docs/i2c_bus_architecture.md
+  - docs/test_strategy.md
+  - docs/architecture.md
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/architect/decisions.md
+  - components/i2c_bus/ only when a phase-specific implementer handoff is active
+Expected changes:
+  - Document phases 1 through 4 in docs/i2c_bus_architecture.md.
+  - Add i2c_bus_transceive in phase 2 and i2c_broker in phase 3 as normative
+    contracts before implementation.
+  - Add I2C validation criteria by phase to docs/test_strategy.md.
+  - Keep b06_hil priority policy in architecture docs, not in generic bus code.
+Module boundaries and contracts:
+  - Follow Incremental Concurrency Architecture in docs/i2c_bus_architecture.md.
+  - Phase 1: direct sync init/probe/add_device only.
+  - Phase 2: i2c_bus_transceive is the only device-driver entry point.
+  - Phase 3: i2c_broker is the only application-task entry point.
+  - Phase 4: debug counters only unless a future telemetry handoff says otherwise.
+  - Priority tables are product configuration in board or app_core.
+Detailed behavior:
+  - Immutable rules: one bus owner, no SDK direct access, atomic transactions,
+    mandatory timeouts, recoverable errors, no long-held bus during app logic.
+  - b06_hil priority table: boot/probe 255, diag 200, INA219 150, OLED 100.
+  - Driver migration: phase 2 uses transceive; phase 3 uses broker_submit.
+  - i2c_transaction_t shape must remain stable between phases 2 and 3.
+Non-goals:
+  - Implementing all phases in one change set.
+  - Per-driver mutex ownership.
+  - Product-specific priorities inside generic i2c_bus code.
+Acceptance criteria:
+  - Concurrency phases and APIs are documented normatively.
+  - Each phase has explicit implementer handoff IDs: I2C_BUS_PHASE1..PHASE4.
+  - Test strategy defines validation per phase.
+  - Another LLM implementer can implement one phase without guessing later phases.
+Constraints:
+  - Implementer must execute only the active phase handoff.
+  - Do not add broker code during phase 1 or 2 handoffs.
+Validation plan:
+  - Phase 1: build, boot, probe, missing OLED no panic.
+  - Phase 2: two-task transaction test without corruption.
+  - Phase 3: 60 s concurrent display and INA219 traffic without deadlock.
+  - Phase 4: debug counters match observed traffic.
+Open questions:
+  - None.
 ```
 
 ## Template
 
 ```text
+Role boundary check:
+  Confirm this handoff is architect-owned work (docs + contracts). Redirect code,
+  builds, and validation to implementer/tester if the human request mixes roles.
 ID:
 Objective:
 Reason:

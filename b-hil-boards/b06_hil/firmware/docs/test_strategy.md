@@ -9,6 +9,9 @@ maintained in English.
 Shared-document changes for the OLED display interface are motivated by
 `agent-workspaces/architect/handoff.md`, `OLED_TEXT_DISPLAY_INTERFACE`.
 
+Shared-document changes for I2C bus validation are motivated by
+`agent-workspaces/architect/handoff.md`, `I2C_BUS_CONCURRENCY`.
+
 ## Levels
 
 - Build: `idf.py build`.
@@ -75,6 +78,53 @@ pixel-perfect text output platform-specific. At minimum, they must verify
 region coordinates, clipped rectangles, line band heights, draw order, inverted
 band fill behavior, QR scale fallback, and QR placement.
 
+## I2C Bus Criteria
+
+I2C validation follows the incremental phases in
+`docs/i2c_bus_architecture.md`. Test only the active implementer phase unless
+the architect explicitly authorizes a multi-phase re-test.
+
+### Phase 1 — Direct sync
+
+- Build succeeds for target `esp32c3`.
+- Firmware boots after `i2c_bus_init()`.
+- Serial logs show bus init on the configured SCL/SDA pins.
+- OLED probe tries board-allowed addresses and logs detected or missing device.
+- Missing OLED at boot does not panic; display stub may continue.
+- No requirement yet for concurrent task I2C traffic.
+
+### Phase 2 — Transaction executor
+
+- `i2c_bus_transceive()` is the only device-driver I2C entry point.
+- Two tasks issuing alternating transactions do not corrupt data or hang the bus.
+- Transaction timeout returns an error and leaves the bus usable for the next
+  transaction.
+- Display driver may still be a stub, but any I2C path it uses must go through
+  `i2c_bus_transceive()`.
+
+### Phase 3 — Priority broker
+
+- `i2c_broker_submit()` is used by application tasks that perform I2C.
+- Display refresh and INA219 periodic reads can run concurrently for at least
+  60 s without deadlock.
+- Higher-priority INA219 traffic is not blocked for more than one sample interval
+  by OLED traffic under normal load.
+- Broker timeout returns an error without requiring reboot.
+
+### Phase 4 — Observability (optional)
+
+- Debug counters for submitted, completed, timeout, and dropped requests match
+  observed traffic within the test window.
+
+### I2C test record additions
+
+When validating an I2C phase, extend the test run record with:
+
+- Active I2C phase handoff ID (`I2C_BUS_PHASE1`, `PHASE2`, etc.).
+- Connected I2C devices and addresses observed.
+- Whether OLED physical traffic was blocked or active.
+- Whether INA219 hardware was present or simulated/deferred.
+
 ## Pending Items
 
 - Define peripheral tests after closing the pin map.
@@ -82,3 +132,5 @@ band fill behavior, QR scale fallback, and QR placement.
 - Automate builds in CI if the repository adopts a pipeline.
 - Define physical OLED tests after confirming I2C pins, display address, and
   chosen driver.
+- Execute I2C phase 3 contention tests after INA219 and physical OLED drivers are
+  both active.

@@ -5,13 +5,15 @@ maintained in English.
 
 ## Pending
 
-- `OLED_TEXT_DISPLAY_INTERFACE`: implement the display contract from
-  `agent-workspaces/architect/handoff.md` and
-  `docs/oled_text_display_interface.md`. Do not enable physical I2C display
-  communication until hardware details are confirmed.
-- Wait for the architect handoff for functional tasks.
+- `I2C_BUS_PHASE3`: implement `i2c_broker` when architect handoff is active.
+- QR encoder integration when library is selected.
+- SH1106 support if hardware differs from SSD1306.
 - Keep the ESP-IDF project buildable.
-- Document questions that block implementation.
+
+## Completed
+
+- `I2C_BUS_ARCHITECTURE` phase 1: shared bus, board helper, app_core startup.
+- `I2C_BUS_PHASE2`: `i2c_bus_transceive`, bus mutex, SSD1306 via transceive.
 
 ## Entry Format
 

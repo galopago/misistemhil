@@ -1,0 +1,136 @@
+# Architecture Decisions
+
+Record decisions that change the shape of the firmware here.
+
+All agentic development methodology documentation in this firmware tree is
+maintained in English.
+
+## Template
+
+```text
+Date:
+Decision:
+Context:
+Alternatives considered:
+Implementation contract:
+Expected behavior:
+Non-goals:
+Consequences:
+Affected files:
+Validation expectations:
+Open questions:
+```
+
+## Initial Decisions
+
+- The firmware is organized as a conventional ESP-IDF project.
+- `main/` remains the system entry point and delegates to components.
+- `components/board/` centralizes board-specific details.
+- Pins remain pending until confirmed against the schematic.
+
+## 2026-06-20 — Mandatory Role Boundary Check
+
+```text
+Date: 2026-06-20
+Decision: Every agent must verify role ownership before editing files or running
+  commands, and must ask the human when a request belongs to another role.
+Context: An architect session implemented firmware and attempted builds despite
+  role ownership defined in AGENTS.md and methodology.md.
+Alternatives considered:
+  - Rely on AGENTS.md ownership list only.
+  - Add role checks only to architect documentation.
+Implementation contract:
+  - Add Role Boundary Check to AGENTS.md and docs/methodology.md.
+  - Add ROLE.md guides under architect/, implementer/, and tester/ workspaces.
+  - Each agent stops and questions the human when a task crosses role boundaries.
+Expected behavior:
+  - Plans that mix documentation and code are split by role at execution time.
+  - Generic verbs such as "implement" do not override ownership rules.
+Non-goals:
+  - Changing the three-role workflow itself.
+Consequences:
+  - Agents may ask the human to confirm or redirect more often.
+  - Reduced cross-role edits and conflicting handoffs.
+Affected files:
+  - firmware/AGENTS.md
+  - firmware/docs/methodology.md
+  - firmware/agent-workspaces/architect/ROLE.md
+  - firmware/agent-workspaces/implementer/ROLE.md
+  - firmware/agent-workspaces/tester/ROLE.md
+Validation expectations:
+  - Each role guide lists owned paths, forbidden paths, and stop conditions.
+Open questions:
+  - None.
+```
+
+## 2026-06-20 — Portable I2C Bus Contract
+
+```text
+Date: 2026-06-20
+Decision: Define I2C bus architecture as a portable logical contract first, with
+  ESP-IDF as the current platform profile.
+Context: The bus must produce similar implementations across LLM implementers and
+  port to other microcontrollers without redesigning device drivers.
+Alternatives considered:
+  - ESP-IDF-only documentation tied to gpio_num_t and i2c_master types in the
+    public contract.
+  - Fully abstract interface with runtime plugin loading.
+Implementation contract:
+  - docs/i2c_bus_architecture.md defines portable API, constants, algorithms,
+    startup order, forbidden dependencies, and ESP-IDF binding separately.
+Expected behavior:
+  - i2c_bus remains device-agnostic and unchanged in display-only projects.
+  - Only the platform port inside i2c_bus changes when moving to another MCU.
+Non-goals:
+  - Multi-bus support and 10-bit addressing in the base version.
+Consequences:
+  - Implementers must follow normative algorithms verbatim.
+  - Port work is localized to i2c_bus platform code and board pin headers.
+Affected files:
+  - docs/i2c_bus_architecture.md
+  - docs/architecture.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - Independent implementers produce the same module layout and init order.
+Open questions:
+  - None.
+```
+
+## 2026-06-20 — Incremental I2C Concurrency Phases
+
+```text
+Date: 2026-06-20
+Decision: Add phased concurrency architecture for shared I2C: direct sync,
+  transaction executor, priority broker, optional observability.
+Context: b06_hil will have concurrent display and INA219 traffic on one bus.
+  Platform driver serialization alone does not define policy or protect logical
+  transaction boundaries.
+Alternatives considered:
+  - Rely only on ESP-IDF master-driver serialization.
+  - Implement a broker immediately in the first I2C change set.
+Implementation contract:
+  - docs/i2c_bus_architecture.md defines phases, APIs, priorities, anti-patterns,
+    and driver migration rules.
+  - docs/test_strategy.md defines validation per phase.
+  - Handoff I2C_BUS_CONCURRENCY authorizes documentation; implementer uses
+    I2C_BUS_PHASE1..PHASE4 one at a time.
+Expected behavior:
+  - Phase 2 introduces i2c_bus_transceive as the only driver entry point.
+  - Phase 3 introduces i2c_broker_submit for application tasks.
+  - b06_hil priority table lives in product config, not generic bus code.
+Non-goals:
+  - Implementing all phases at once.
+  - Per-driver mutex ownership.
+Consequences:
+  - Future INA219 and OLED drivers can grow onto the same bus safely.
+  - Testers validate only the active phase unless re-test is authorized.
+Affected files:
+  - docs/i2c_bus_architecture.md
+  - docs/test_strategy.md
+  - docs/architecture.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - Phase 3 includes 60 s contention test without deadlock.
+Open questions:
+  - None.
+```
