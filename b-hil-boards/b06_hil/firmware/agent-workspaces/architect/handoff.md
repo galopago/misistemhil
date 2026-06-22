@@ -20,14 +20,17 @@ Active handoffs:
 - `I2C_BUS_ARCHITECTURE`
 - `I2C_BUS_CONCURRENCY`
 - `QR_ENCODER_INTERFACE`
+- `DISPLAY_DELIVERY_CONTRACT`
 
 I2C pins, OLED address candidates, `INA219` addresses, error LED polarity, and
 factory reset switch polarity are recorded in
 `docs/esp32_c3_supermini_connections.md`. Generic shared I2C bus structure and
 incremental concurrency phases are recorded in
 `docs/i2c_bus_architecture.md`. QR encoder rules and `http://IPv4` payload
-profile are recorded in `docs/qr_encoder_interface.md`. The implementer must
-still keep physical OLED driver/controller selection isolated until confirmed.
+profile are recorded in `docs/qr_encoder_interface.md`. Display delivery from
+producers to the OLED stack is recorded in
+`docs/display_delivery_contract.md`. The implementer must still keep physical
+OLED driver/controller selection isolated until confirmed.
 
 ## OLED_TEXT_DISPLAY_INTERFACE
 
@@ -340,9 +343,65 @@ Validation plan:
   - Hardware scan test of QR_LEFT_TEXT_RIGHT when OLED driver is active.
   - Record measured flash/RAM after first integration.
 Open questions:
-  - External URL producer module name, location, and draw-QR trigger.
-  - Delivery contract from producer to display_controller_show_qr_setup.
+  - External URL producer module name, location, and SHOW_QR_SETUP trigger event.
   - Confirm components/setup_url/ and vendor path at implementation time.
+  - Confirm callback vs esp_event when producer is implemented.
+```
+
+## DISPLAY_DELIVERY_CONTRACT
+
+```text
+ID: DISPLAY_DELIVERY_CONTRACT
+Objective:
+  Implement and enforce the v1 path from application producers to the OLED stack:
+  producer notifies app_core; only app_core calls display_controller_* directly.
+Reason:
+  The delivery mechanism was an open architectural question. A single orchestrator
+  avoids polling, multi-caller races, and coupling network code to display APIs.
+Authorized files:
+  - docs/display_delivery_contract.md
+  - docs/architecture.md cross-references
+  - docs/oled_text_display_interface.md cross-references only
+  - docs/qr_encoder_interface.md cross-references only
+  - docs/test_strategy.md
+  - components/app_core/ for notification handlers and sole display_controller calls
+  - future producer components for notify-only integration (no display includes)
+  - agent-workspaces/implementer/ for implementation notes
+Expected changes:
+  - Add app_core notification surface (esp_event and/or register hooks).
+  - Route SHOW_QR_SETUP to display_controller_show_qr_setup after setup_url_validate.
+  - Ensure no module other than app_core includes display_controller.h in v1.
+  - Document chosen notification transport in implementer handoff when producer exists.
+Module boundaries and contracts:
+  - Follow docs/display_delivery_contract.md as normative source.
+  - Producer: notify app_core only; validate URL with setup_url before notify.
+  - app_core: sole display_controller_* caller; task context only; no polling.
+  - Display stack unchanged below DisplayController.
+Detailed behavior:
+  - Transport: callback into app_core OR esp_event post handled by app_core.
+  - No application queue between producer and app_core in v1.
+  - display_task internal queue remains the only display pipeline queue.
+  - Invalid URL notifications rejected at app_core without display calls.
+  - URL replacement via second notification uses same direct call path.
+Non-goals:
+  - Producer direct calls to display_controller_* or display_set_*.
+  - Polling for pending QR or URL state.
+  - Application-level display command queue separate from display_task.
+  - ISR-to-display calls.
+Acceptance criteria:
+  - Grep audit: only app_core includes display_controller.h in v1 firmware.
+  - Valid SHOW_QR_SETUP notification results in QR layout on device.
+  - Invalid URL does not invoke display APIs.
+  - docs/display_delivery_contract.md acceptance criteria satisfied.
+Constraints:
+  - Do not widen display_controller callers without new architect handoff.
+  - Producer module identity may remain TBD; contract must work with test hook.
+Validation plan:
+  - Implementer documents grep result and notification transport choice.
+  - Tester verifies QR via app_core test event/hook without producer bypass.
+Open questions:
+  - Producer module name, location, and product trigger for SHOW_QR_SETUP.
+  - Pin callback vs esp_event when producer is implemented.
 ```
 
 ## Template

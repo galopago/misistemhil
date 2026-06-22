@@ -229,12 +229,13 @@ flowchart TD
 
 ### DisplayController
 
-- Is the single owner of display content decisions.
-- Receives or observes application data such as sensor readings, machine
-  states, and alerts.
-- Chooses what informational content should be visible at any moment.
-- Builds the `DisplayLayout` and region content sent to the display task.
-- Applies priority rules outside the low-level display renderer.
+- Is the single owner of display content decisions **within the display component**.
+- In v1 firmware, **only `app_core` may invoke** `display_controller_*` APIs; see
+  `docs/display_delivery_contract.md`.
+- Receives layout instructions from `app_core` and forwards them to the display task.
+- Builds `DisplayLayout` and region content (including templates) for each call.
+- Applies visual structure rules; product-level screen priority is decided in
+  `app_core` before calling the display API.
 
 ### DisplayTask
 
@@ -908,9 +909,11 @@ The display must be managed by an independent task, process, actor, or
 component.
 
 The display task is not responsible for deciding what information has priority.
-Only `DisplayController` should send content updates to the display task. Other
-application modules must report their data or state to `DisplayController`
-instead of writing to the display directly.
+In v1, **`app_core` orchestrates** which display API to call; producers notify
+`app_core` rather than posting to the display task directly. See
+`docs/display_delivery_contract.md`. Other application modules must not call
+`display_controller_*` or `display_set_*` except through the documented
+`app_core` path.
 
 Responsibilities:
 
@@ -1322,6 +1325,9 @@ Expected behavior:
   sanitized to `?` per Character Set Policy (v1 Product).
 - QR encoding must follow `docs/qr_encoder_interface.md`. The display controller
   must not construct setup URLs from network state.
+- Display instructions from application logic MUST follow
+  `docs/display_delivery_contract.md` (`app_core` only caller of
+  `display_controller_*`).
 - The initial implementation must not enable the I2C peripheral until the
   ESP32-C3 SuperMini pin map is confirmed against the schematic.
 - Hardware address, I2C bus, contrast, and orientation belong to driver or

@@ -15,6 +15,9 @@ Shared-document changes for I2C bus validation are motivated by
 Shared-document changes for QR encoder validation are motivated by
 `agent-workspaces/architect/handoff.md`, `QR_ENCODER_INTERFACE`.
 
+Shared-document changes for display delivery validation are motivated by
+`agent-workspaces/architect/handoff.md`, `DISPLAY_DELIVERY_CONTRACT`.
+
 ## Levels
 
 - Build: `idf.py build`.
@@ -133,6 +136,30 @@ When validating QR encoder work, extend the test run record with:
 - Nayuki vendor version or commit pin.
 - Payload strings exercised.
 - Whether encode was host-only or verified by camera/scanner on device.
+
+## Display Delivery Criteria
+
+Validation follows `docs/display_delivery_contract.md`.
+
+### Caller discipline
+
+- Only `components/app_core/` includes `display_controller.h` in v1 firmware
+  (display component internals excluded from this grep rule).
+- No producer component includes `display_controller.h` or `display.h`.
+
+### Notification path
+
+- A test hook or mock producer can notify `app_core` (event or callback) with a
+  valid `http://IPv4` URL.
+- `app_core` invokes `display_controller_show_qr_setup` (direct call) after
+  `setup_url_validate` succeeds.
+- Invalid URL notification does not call display APIs.
+- Second notification with a different valid URL updates the screen via the same path.
+
+### Non-requirements
+
+- No test shall require an application-level queue between producer and `app_core`.
+- No test shall poll for pending QR state in firmware loops.
 
 ## I2C Bus Criteria
 

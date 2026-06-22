@@ -170,7 +170,41 @@ Affected files:
 Validation expectations:
   - Tests in docs/test_strategy.md QR Encoder Criteria section.
 Open questions:
-  - External URL producer module and delivery contract for draw-QR instructions.
+  - External URL producer module and SHOW_QR_SETUP trigger event.
+  - Callback vs esp_event pin when producer is implemented.
+```
+
+## 2026-06-20 — Display Delivery via app_core Orchestration
+
+```text
+Date: 2026-06-20
+Decision: v1 display instructions use centralized app_core orchestration. Producers
+  notify app_core (callback or esp_event); only app_core calls display_controller_*
+  directly. No application queue; no polling; no multi-caller display access.
+Context: User selected the pragmatic pattern over queue, polling, or producer-direct
+  display calls after architectural options review.
+Implementation contract:
+  - docs/display_delivery_contract.md is normative.
+  - docs/architecture.md Display Delivery section summarizes the path.
+  - Handoff DISPLAY_DELIVERY_CONTRACT authorizes app_core integration work.
+Expected behavior:
+  - producer --notify--> app_core --display_controller_*--> display_task --> OLED
+  - setup_url validation before display call for QR notifications.
+Non-goals:
+  - Producer calls display_controller_* or display_set_*.
+  - Application-level display command queue.
+  - Polling for QR/URL readiness.
+Affected files:
+  - docs/display_delivery_contract.md
+  - docs/architecture.md
+  - docs/oled_text_display_interface.md
+  - docs/qr_encoder_interface.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - docs/test_strategy.md Display Delivery Criteria section.
+Open questions:
+  - Producer module identity and primary notification transport pin at implementation.
 ```
 
 ## 2026-06-20 — Unified QR Refresh Policy

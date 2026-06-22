@@ -17,6 +17,10 @@ module supplies the payload string; shared validation lives in `setup_url`.
 Display text and QR payloads follow the printable ASCII v1 character policy in
 `docs/oled_text_display_interface.md` (unsupported characters become `?`).
 
+Draw-QR and other display instructions are delivered per
+`docs/display_delivery_contract.md`: producers notify `app_core`; only `app_core`
+calls `display_controller_*`.
+
 ## Sporadic QR Usage and Dynamic Display
 
 QR is **occasional**, not a permanent reserved area on the screen.
@@ -92,19 +96,22 @@ Rules:
 ```mermaid
 flowchart LR
     ExternalModule[external module TBD] --> SetupUrl[setup_url]
-    SetupUrl --> AppOrCore[app_core or orchestrator]
-    AppOrCore --> DisplayController[DisplayController]
+    SetupUrl --> AppCore[app_core orchestrator]
+    AppCore -->|"display_controller_* direct call"| DisplayController[DisplayController]
     DisplayController --> DisplayTask[display_task]
     DisplayTask --> QrEncoder[display_qr plus qrcodegen]
     QrEncoder --> Renderer[render_qr_region]
 ```
 
+External modules notify `app_core` (callback or `esp_event`); they MUST NOT call
+`display_controller_*` directly. See `docs/display_delivery_contract.md`.
+
 | Layer | Responsibility | Must not |
 | --- | --- | --- |
-| External module (TBD) | Obtain network context and trigger URL updates | Draw pixels or encode QR |
+| External module (TBD) | Obtain network context; validate URL; notify `app_core` | Draw pixels, encode QR, or call `display_controller_*` |
 | `setup_url` | Format and validate `http://IPv4` strings | Talk to display hardware |
-| `app_core` or orchestrator | Deliver validated payload to display API | Encode QR matrices |
-| `DisplayController` | Build layout and fallback text | Read network interfaces |
+| `app_core` | Receive producer notifications; call `display_controller_*` | Encode QR matrices or touch I2C |
+| `DisplayController` | Build layout and optional companion text | Read network interfaces |
 | `display_qr` | Encode payload to module matrix via Nayuki | Parse IP addresses |
 | `ViewRenderer` | Scale, quiet zone, clip, draw modules | Choose QR library |
 
@@ -293,10 +300,10 @@ Rules:
 - `setup_url_format_ipv4` writes `http://a.b.c.d` when all octets are `0..255`
   and `out_len` is sufficient (minimum 15 bytes for `http://0.0.0.0` plus NUL).
 - `setup_url_validate` accepts only the v1 product profile (`http://IPv4`).
-- An external module issues a draw-QR instruction when the product needs a QR
-  screen and supplies the finished URL string at that moment.
-- `DisplayController` applies the instruction by building or accepting a layout
-  with a QR region. It MUST NOT read network interfaces or wait for IP validity.
+- An external module notifies `app_core` when a QR screen is needed and supplies
+  a finished URL string validated with `setup_url`.
+- `app_core` calls `display_controller_show_qr_setup` or equivalent layout API.
+- `DisplayController` MUST NOT read network interfaces or accept direct producer calls.
 
 ## Invalid Input and Fallback Behavior
 
@@ -356,15 +363,22 @@ Tester:
 
 ## Open Questions
 
-These items do not block encoder implementation but MUST remain explicit until a
-future architect handoff closes them:
+These items do not block encoder or delivery-contract implementation but MUST
+remain explicit until closed:
 
-1. **External URL producer module** — component name, location, and the event or
-   condition that triggers a draw-QR instruction.
-2. **Delivery contract to display** — callback, queue, polling, or direct call to
-   `display_controller_show_qr_setup` when an instruction is issued.
+1. **External URL producer module** — component name, location, and the product
+   event that triggers `SHOW_QR_SETUP` notification to `app_core`.
+2. **Notification transport pin** — confirm callback vs `esp_event` when the
+   producer module is implemented (either is valid; see
+   `docs/display_delivery_contract.md`).
 3. **`setup_url` component path** — confirm `components/setup_url/` at implementation.
 4. **Nayuki vendor path** — confirm `components/qr_encoder/vendor/` layout at implementation.
 5. **Measured flash/RAM budget** — record after first integration build.
 6. **Future URL extensions** — `https://`, port, path in QR payload, IPv6 remain
    out of scope until a new product profile is authorized.
+
+Closed in v1 architecture:
+
+- **Delivery contract to display** — centralized `app_core` orchestration with
+  direct `display_controller_*` calls after producer callback or `esp_event`
+  (`docs/display_delivery_contract.md`).

@@ -16,11 +16,15 @@ Shared-document changes for I2C concurrency are motivated by
 Shared-document changes for the QR encoder are motivated by
 `agent-workspaces/architect/handoff.md`, `QR_ENCODER_INTERFACE`.
 
+Shared-document changes for display delivery are motivated by
+`agent-workspaces/architect/handoff.md`, `DISPLAY_DELIVERY_CONTRACT`.
+
 ## Layers
 
 ```mermaid
 flowchart TD
     AppMain[main] --> AppCore[components/app_core]
+    Producer[producer module TBD] -->|"callback or esp_event"| AppCore
     AppCore --> Board[components/board]
     AppCore --> I2cBus[components/i2c_bus]
     AppCore --> I2cBroker[i2c_broker phase3]
@@ -38,7 +42,9 @@ flowchart TD
 ## Responsibilities
 
 - `main/`: ESP-IDF entry point. It must initialize and delegate.
-- `components/app_core/`: main loop and application rules.
+- `components/app_core/`: application orchestration, **sole caller of
+  `display_controller_*` in v1**, and main product rules. Display delivery is
+  defined in `docs/display_delivery_contract.md`.
 - `components/board/`: pin map, board details, and abstractions specific to
   `b06_hil`.
 - `components/i2c_bus/`: generic shared I2C master bus and device-handle
@@ -89,6 +95,30 @@ flowchart TD
   user input in the architecture.
 - Display power saving (sleep, dim, panel off) is out of scope for v1; the product
   is occasional-use, not continuous 24/7 operation.
+
+## Display Delivery (v1)
+
+All display and draw-QR instructions follow **`docs/display_delivery_contract.md`**.
+
+Summary:
+
+```text
+producer (TBD)  --notify-->  app_core  --display_controller_*-->  display stack
+```
+
+Rules:
+
+- **Only `app_core`** calls `display_controller_show_qr_setup`,
+  `display_controller_show_template`, or `display_controller_show_layout` in v1.
+- Producers notify `app_core` via **callback or `esp_event`**, not by calling display
+  APIs and not by polling.
+- **No application-level queue** between producers and `app_core`; the existing
+  `display_task` queue remains the internal display pipeline queue.
+- Producers supply validated intent (`http://IPv4` for QR); `app_core` invokes the
+  display API once per instruction.
+
+Rejected for v1: producer → `display_controller` direct calls, producer polling,
+multi-caller display access, ISR-to-display calls.
 
 ## Toolchain Environment
 
