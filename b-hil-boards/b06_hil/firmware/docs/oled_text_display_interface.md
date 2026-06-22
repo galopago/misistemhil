@@ -345,8 +345,10 @@ Invalid numeric dimensions MUST be handled through best-effort clipping.
   from the text region.
 - QR payloads must use printable ASCII.
 - In the `b06_hil` v1 product profile, QR payloads MUST be `http://` followed by
-  a valid IPv4 address. Payload strings are supplied by modules outside the
-  display controller; see `docs/qr_encoder_interface.md`.
+  a valid IPv4 address only (implicit site root `/`; no path in the string).
+  Redirects to `/something` are handled outside the display stack. Payload strings
+  are supplied by modules outside the display controller; see
+  `docs/qr_encoder_interface.md`.
 - QR rendering must not imply support for arbitrary images or general bitmap
   drawing.
 - The renderer should use best-effort rendering for malformed or partially

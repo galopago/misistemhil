@@ -298,7 +298,10 @@ Module boundaries and contracts:
   - display_qr owns matrix encoding only; renderer owns drawing.
   - DisplayController owns fallback text when encode fails.
 Detailed behavior:
-  - Product payloads: http:// plus IPv4, length 14 to 22 chars, QR version 1 or 2.
+  - Product payloads: http:// plus IPv4 only, implicit root /, length 14 to 22 chars,
+    QR version 1 or 2.
+  - No path in QR string; redirects to /something are another entity's job.
+  - https excluded for v1 (unlikely TLS on small MCU local setup).
   - Version ceiling 2; payloads over 32 bytes after sanitize must fail.
   - Static matrix buffer 25x25 in display_qr; no heap in v1.
   - Only display_task may call display_qr_generate in v1.
@@ -308,7 +311,8 @@ Detailed behavior:
   - QR is instruction-driven: no display-side wait or poll for IP/URL availability.
   - QR refresh uses the same display update path as any other layout or content change.
 Non-goals:
-  - https, hostname, port, path, IPv6 payloads in v1.
+  - https, hostname, port, path in QR payload, IPv6 in v1.
+  - Firmware-owned HTTP redirects or subpath routing after QR scan.
   - Hand-rolled QR encoding.
   - Display-owned URL construction from network APIs.
   - A fixed always-on QR panel or split-screen reserved for QR.

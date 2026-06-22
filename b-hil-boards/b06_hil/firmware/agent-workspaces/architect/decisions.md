@@ -219,6 +219,36 @@ Open questions:
   - None.
 ```
 
+## 2026-06-20 — Root-Only HTTP URL and No HTTPS in QR v1
+
+```text
+Date: 2026-06-20
+Decision: v1 QR payloads are http://IPv4 with implicit root / only. No path in the
+  QR string. Redirects to /something are handled by another entity, not firmware.
+  https is out of scope for v1 because TLS is unlikely on small MCUs like ESP32-C3
+  for local setup in this product.
+Context: User confirmed the scanned page is the site root; subpath routing and
+  HTTPS termination are outside the display/encoder stack.
+Implementation contract:
+  - docs/qr_encoder_interface.md sections Root page and redirects, Why not HTTPS.
+  - setup_url_validate rejects paths and https schemes.
+Expected behavior:
+  - QR encodes e.g. http://192.168.4.1 (browser opens /).
+  - Server or portal may redirect after scan; firmware does not encode /setup etc.
+Non-goals:
+  - https in QR, path suffixes in QR, firmware redirect logic.
+Affected files:
+  - docs/qr_encoder_interface.md
+  - docs/oled_text_display_interface.md
+  - docs/architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - setup_url_validate rejects http://ip/path and https://ip.
+Open questions:
+  - None.
+```
+
 ## 2026-06-20 — Printable ASCII Only (v1 Character Set)
 
 ```text

@@ -83,6 +83,8 @@ flowchart TD
   path as any other content change.
 - On-screen strings for v1 are printable ASCII only; tildes, accented letters,
   and non-English scripts are out of scope. Unsupported characters sanitize to `?`.
+- Setup QR payloads are `http://IPv4` (implicit root `/` only). Path redirects
+  and HTTPS are out of scope; another entity handles routing after scan.
 
 ## Toolchain Environment
 

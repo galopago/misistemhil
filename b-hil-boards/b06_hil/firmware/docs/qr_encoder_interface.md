@@ -114,8 +114,35 @@ flowchart LR
 
 - Scheme: `http://` only.
 - Host: IPv4 dotted-decimal with four octets in `0` to `255`.
-- No port, path, query, fragment, username, or password in v1.
+- Implicit path: **root only** (`/`). The encoded string is exactly
+  `http://a.b.c.d` with no path suffix.
+- No port, path, query, fragment, username, or password in the QR payload string.
 - No `https://` in v1.
+
+### Root page and redirects (out of firmware scope)
+
+The QR points the user's device at the **site root** on that IPv4 address. HTTP
+clients treat `http://192.168.4.1` as `http://192.168.4.1/` by default.
+
+Rules:
+
+- The firmware display and encoder stack MUST NOT encode paths such as `/setup`
+  or `/config` in the QR payload for v1.
+- If the user must end up at `/something` after scan, **another entity** (for
+  example an HTTP server, captive portal, or reverse proxy on the network side)
+  performs that redirect or routing. That behavior is outside `b06_hil` display
+  and QR encoder scope.
+- The draw-QR instruction supplies only the root URL form; redirect policy is not
+  a display concern.
+
+### Why not HTTPS in v1
+
+`https://` is intentionally excluded for this product profile. Small
+microcontrollers such as the ESP32-C3 SuperMini target on `b06_hil` are unlikely
+to terminate TLS for a local setup page in this use case: certificate handling,
+memory, and CPU cost are poor fits for v1. Local setup over plain `http://` on a
+private IPv4 address is the accepted trade-off until a future handoff authorizes
+HTTPS and defines who terminates TLS.
 
 ### Grammar
 
@@ -152,12 +179,13 @@ Rules:
 
 ### Out of scope for v1
 
-- `https://`
+- `https://` (see **Why not HTTPS in v1** above)
 - Hostnames and DNS
 - IPv6
 - Port suffixes (`:8080`)
-- URL paths (`/setup`)
-- Arbitrary arbitrary URLs or free-form text QR payloads
+- URL paths in the QR string (`/setup`, `/config`, etc.); root `/` is implicit only
+- HTTP redirects to subpaths (handled by another entity, not firmware)
+- Arbitrary URLs or free-form text QR payloads
 
 ## Encoder Library
 
@@ -338,5 +366,5 @@ future architect handoff closes them:
 3. **`setup_url` component path** — confirm `components/setup_url/` at implementation.
 4. **Nayuki vendor path** — confirm `components/qr_encoder/vendor/` layout at implementation.
 5. **Measured flash/RAM budget** — record after first integration build.
-6. **Future URL extensions** — `https://`, port, path, IPv6 remain out of scope
-   until a new product profile is authorized.
+6. **Future URL extensions** — `https://`, port, path in QR payload, IPv6 remain
+   out of scope until a new product profile is authorized.

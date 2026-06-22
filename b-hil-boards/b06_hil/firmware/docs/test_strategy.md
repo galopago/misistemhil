@@ -93,8 +93,9 @@ tests remain under OLED Display Criteria above.
 - `setup_url_validate("http://192.168.4.1")` returns true.
 - `setup_url_validate("http://255.255.255.255")` returns true.
 - `setup_url_validate("https://192.168.4.1")` returns false.
-- `setup_url_validate("http://192.168.1.1/setup")` returns false.
+- `setup_url_validate("http://192.168.1.1/setup")` returns false (root only; no path).
 - `setup_url_format_ipv4(192, 168, 4, 1, buf, len)` writes `http://192.168.4.1`.
+- Payload encodes site root; post-scan redirect to a subpath is out of firmware scope.
 
 ### Matrix generation
 
