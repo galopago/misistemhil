@@ -534,3 +534,38 @@ Validation expectations:
 Open questions:
   - None.
 ```
+
+## 2026-06-20 — Architect Immutable Mission Pillar
+
+```text
+Date: 2026-06-20
+Decision: Architect task completes with documentation/architecture artifacts only;
+  mission pillar is immutable while role is architect and cannot be overridden by
+  plans, todos, harness, or conflicting prompts.
+Context: Need explicit rule that "finish the task" means close docs/handoff, not
+  ship firmware; prior sessions treated plan completion as permission to code.
+Alternatives considered:
+  - Rely on hard stop forbidden paths only without definition of done.
+Implementation contract:
+  - docs/architect_role_hard_stop.md § Immutable mission pillar at document top.
+  - ROLE.md, AGENTS.md, methodology.md cross-reference mission and definition of done.
+  - Priority rule: docs over code; partial firmware is role violation.
+Expected behavior:
+  - Architect stops when docs/handoff are complete even if code todos remain.
+  - finish the task / complete all todos interpreted as architect slice only.
+Non-goals:
+  - Changing implementer or tester role definitions.
+Consequences:
+  - Architect may report task DONE without build or flash evidence.
+Affected files:
+  - docs/architect_role_hard_stop.md
+  - agent-workspaces/architect/ROLE.md
+  - AGENTS.md
+  - docs/methodology.md
+  - agent-workspaces/architect/decisions.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - Architect cites mission pillar when asked to code to "finish the task".
+Open questions:
+  - None.
+```

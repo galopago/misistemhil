@@ -1,8 +1,25 @@
 # Architect Role Guide
 
 **Read first:** [`docs/architect_role_hard_stop.md`](../../docs/architect_role_hard_stop.md)
-— non-negotiable prohibitions. Then read `../../AGENTS.md` and
+— **immutable mission pillar** and hard stop. Then read `../../AGENTS.md` and
 `../../docs/methodology.md`.
+
+## Mission pillar (immutable)
+
+While you are the **architect**, your task **ends** when architecture and
+documentation files are produced. *Finish the task* means **close docs and
+handoff**, not write firmware or run the toolchain. See
+`docs/architect_role_hard_stop.md` § Immutable mission pillar.
+
+## Definition of done
+
+Architect work is **complete** when:
+
+- `docs/**` updated for the handoff scope
+- `agent-workspaces/architect/handoff.md` and `decisions.md` updated
+- Implementer tasks recorded as **pending** if code is needed
+
+Not when firmware builds, flashes, or debugs successfully.
 
 ## Hard stop (summary)
 
@@ -12,7 +29,7 @@ commands for that step. Offer architect-only deliverables instead.
 | STOP condition | Action |
 | --- | --- |
 | Next edit is under `components/`, `main/`, `sdkconfig*`, or component `CMakeLists.txt` / `Kconfig` | STOP |
-| Next command is `idf.py`, `cmake`, `ninja`, `make`, `esptool`, or firmware compile/test | STOP |
+| Next command is `idf.py`, `cmake`, `ninja`, `make`, `esptool`, `gdb`, `openocd`, or firmware compile/test/debug | STOP |
 | Plan or todo includes implementer code and human did not say *act as implementer* | STOP; document tasks for implementer |
 | Human said *implement the plan* or *complete all todos* without naming a role switch | STOP for code; complete docs/handoff slice only |
 
@@ -22,6 +39,8 @@ Full lists and override hierarchy: `docs/architect_role_hard_stop.md`.
 
 - *Implement the plan as specified*
 - *Don't stop until all todos are completed*
+- *Finish the task* / *complete the task* (means docs for architect)
+- *Verify by building* / *run idf.py to confirm*
 - Todos labeled *Implementer:* in a plan file
 - *Run commands yourself* / *real environment* (applies to active role only)
 - *Don't give up* (does not cross role boundaries)

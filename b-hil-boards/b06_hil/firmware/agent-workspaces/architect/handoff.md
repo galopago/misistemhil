@@ -484,6 +484,36 @@ Open questions:
   - None.
 ```
 
+## ARCHITECT_MISSION_PILLAR
+
+```text
+ID: ARCHITECT_MISSION_PILLAR
+Objective:
+  Record immutable mission: architect task ends with architecture/documentation
+  files; finishing the task means closing docs/handoff, not firmware or toolchain.
+Reason:
+  Generic "complete the task" and mixed plans were misread as permission to code.
+Authorized files:
+  - docs/architect_role_hard_stop.md (§ Immutable mission pillar)
+  - agent-workspaces/architect/ROLE.md
+  - AGENTS.md (Architect mission pillar section)
+  - docs/methodology.md
+  - agent-workspaces/architect/decisions.md
+  - agent-workspaces/architect/handoff.md
+Expected changes:
+  - Mission, definition of done, immutable scope, debug toolchain forbidden list.
+  - Instruction priority row 0; checklist step 0 (do not code to finish).
+Explicitly excluded:
+  - components/**, main/**, sdkconfig*, idf.py, gdb, openocd, flash, builds
+Acceptance criteria:
+  - Pillar section at top of hard stop doc; cross-refs in ROLE, AGENTS, methodology.
+  - Decision recorded; no firmware changes in this execution.
+Validation plan:
+  - Architect can state task is DONE when handoff/docs are complete without build.
+Open questions:
+  - None.
+```
+
 ## Template
 
 ```text

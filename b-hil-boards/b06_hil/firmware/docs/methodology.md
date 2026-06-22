@@ -50,6 +50,12 @@ before handoff, or leave the item explicitly blocked as an open question.
 or flash hardware, and does **not** write tester validation reports. If asked to
 do those, stop and redirect to the implementer or tester.
 
+**Mission pillar:** The architect task **finishes** when architecture and
+documentation files are produced (`docs/**`, `agent-workspaces/architect/**`).
+*Finish the task* means complete those artifacts, not firmware. See
+[`docs/architect_role_hard_stop.md`](architect_role_hard_stop.md) § Immutable
+mission pillar.
+
 **Hard stop:** Obey [`docs/architect_role_hard_stop.md`](architect_role_hard_stop.md).
 Plans, todos, and phrases such as *implement the plan* or *complete all todos*
 do **not** override this. Document Kconfig symbols and demo manifests in
@@ -108,6 +114,8 @@ flowchart TD
   and ask the human to confirm the correct agent before continuing.
 - **A plan or todo list never overrides the architect hard stop** (see
   `docs/architect_role_hard_stop.md`).
+- **Completing a mixed plan as architect** means completing the documentation
+  slice only; partial firmware does **not** count as task completion.
 - Changes to `components/board/` require confirmation against the schematic.
 - Changes to `sdkconfig.defaults` must explain the reason.
 

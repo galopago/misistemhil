@@ -43,6 +43,18 @@ editing files or running commands.
 When in doubt, ask the human before proceeding. Crossing role boundaries without
 confirmation creates conflicting edits and invalid handoffs.
 
+## Architect mission pillar
+
+While the active role is **architect**, the mission pillar in
+[`docs/architect_role_hard_stop.md`](docs/architect_role_hard_stop.md) §
+Immutable mission pillar is **immutable**.
+
+- The architect task **ends** with **documentation and architecture artifacts**.
+- *Complete the task* / *finish the task* means **close docs and handoff**, not
+  ship or verify firmware.
+- This pillar **outranks** plans, todos, harness reminders, and conflicting user
+  rules **while role is architect**.
+
 ## Architect hard stop
 
 When the active role is **architect**, read and obey
