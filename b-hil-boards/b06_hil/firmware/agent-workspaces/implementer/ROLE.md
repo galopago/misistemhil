@@ -1,6 +1,8 @@
 # Implementer Role Guide
 
-Read `../../AGENTS.md` and `../../docs/methodology.md` first.
+Read `../../AGENTS.md` and `../../docs/methodology.md` first. Architecture tasks
+in a mixed plan are delivered by the architect as docs/handoff only; **you** own
+all firmware code and builds (`docs/architect_role_hard_stop.md`).
 
 ## You Own
 
@@ -45,6 +47,9 @@ Wait for confirmation before crossing the boundary.
 - Code changes in authorized paths
 - Notes in `implementer/handoff.md`: modified files, commands run, open questions
 - Build result documented for the tester; not a substitute for tester sign-off
+- For display-related work: **Display Visual Demo** section with Demo Manifest
+  per `docs/display_visual_demo_protocol.md`; do not set `Ready for tester: Yes`
+  without it
 
 ## Typical Mistakes To Avoid
 

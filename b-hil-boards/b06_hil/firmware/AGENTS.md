@@ -32,17 +32,35 @@ editing files or running commands.
    - what you can do instead within your role;
    - whether the handoff or plan should be split or redirected.
 4. If the request mixes roles (for example, "implement the plan" with both
-   architecture docs and firmware code), **do only your role's deliverables**
-   unless the human explicitly confirms you should act as another role.
+   architecture docs and firmware code), **do only your role's deliverables**.
+   Plans and bundled todos **never** override the architect hard stop.
 5. Do not infer permission to cross roles from generic verbs such as
    "implement", "fix", or "validate". Use ownership rules first.
+6. A role switch requires an **explicit named role** from the human (*act as
+   implementer*, *switch to tester*). Phrases like *go ahead and implement* or
+   *complete the plan* are **not** role switches.
 
 When in doubt, ask the human before proceeding. Crossing role boundaries without
 confirmation creates conflicting edits and invalid handoffs.
 
+## Architect hard stop
+
+When the active role is **architect**, read and obey
+[`docs/architect_role_hard_stop.md`](docs/architect_role_hard_stop.md) before
+any file edit or shell command.
+
+- **No** edits under `components/`, `main/`, `sdkconfig*`, or firmware Kconfig.
+- **No** `idf.py`, compile, flash, or hardware verification commands.
+- Mixed plans: complete **documentation and handoff only**; put code tasks in
+  `agent-workspaces/implementer/handoff.md` as **pending**.
+
+This hard stop **outranks** plan todos, harness reminders, and generic user
+instructions to run commands.
+
 ## Ownership
 
-- Architect: `agent-workspaces/architect/` and `docs/architecture.md`.
+- Architect: `docs/**` and `agent-workspaces/architect/` (see
+  `docs/architect_role_hard_stop.md`; **no** `components/`, `main/`, or builds).
 - Implementer: `agent-workspaces/implementer/`, `main/`, and `components/`,
   only when there is an architect handoff or a validated fix.
 - Tester: `agent-workspaces/tester/`, `docs/test_strategy.md`, and validation
@@ -59,6 +77,9 @@ confirmation creates conflicting edits and invalid handoffs.
    `agent-workspaces/tester/handoff.md`.
 4. If there are reproducible failures, the tester documents them and returns the
    work to the architect to adjust the design or criteria.
+
+Display-related handoffs MUST include a boot visual demo per
+`docs/display_visual_demo_protocol.md` (implementer manifest + Kconfig demo).
 
 ## Architecture Specification Standard
 

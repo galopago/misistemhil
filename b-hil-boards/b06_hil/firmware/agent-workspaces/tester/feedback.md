@@ -24,6 +24,37 @@ Classification: Pass — matches expected demo content and layout
 Next action: Close Run 004 visual criterion; no display bug filed
 ```
 
+### Entry 002 — Visual demo per-step template
+
+Use one entry per test run (or one per step if steps fail independently).
+
+```text
+Date:
+Person:
+Context: Run NNN — handoff ID — CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO=y|n
+Handoff manifest steps: N
+
+Step 1 — name=FULL_FOUR_LINES
+  Expected:
+  Observed (human):
+  Result: PASS | FAIL | BLOCKED
+
+Step 2 — name=QR_SETUP
+  Expected:
+  Observed (human):
+  QR scanned on phone: yes | no | not tried
+  Result: PASS | FAIL | BLOCKED
+
+Step 3 — name=FULL_TWO_LINES
+  Expected:
+  Observed (human):
+  Result: PASS | FAIL | BLOCKED
+
+Serial evidence: grep DEMO_STEP in <log path>
+Technical conclusion: PASS | FAIL | BLOCKED (whole demo)
+Next action:
+```
+
 ## Template
 
 ```text

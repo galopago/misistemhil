@@ -403,6 +403,87 @@ Open questions:
   - Instruction source identity if not fully internal to app_core.
 ```
 
+## DISPLAY_VISUAL_DEMO_PROTOCOL
+
+```text
+ID: DISPLAY_VISUAL_DEMO_PROTOCOL
+Objective:
+  Require a short boot-time OLED demo-test (Kconfig-gated) and handoff Demo
+  Manifest so the tester and a human operator can validate what appears on the
+  physical panel after display-related work.
+Reason:
+  Run 005 passed encoder and delivery on host/serial but did not exercise QR on
+  hardware at boot. Human visual validation was implicit or reused from prior runs.
+Authorized files:
+  - docs/display_visual_demo_protocol.md
+  - docs/test_strategy.md (Display Visual Demo Criteria)
+  - docs/methodology.md (Definition Of Ready)
+  - AGENTS.md (handoff protocol reference)
+  - components/app_core/ (app_core_display_demo.c, Kconfig, app_core.c)
+  - sdkconfig.defaults
+  - agent-workspaces/implementer/ and agent-workspaces/tester/ templates
+Expected changes:
+  - CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO (default y in sdkconfig.defaults).
+  - app_core_run_visual_demo() with baseline v1 three-step sequence.
+  - Serial markers DEMO_STEP i/N name= hold_ms= and DEMO_STEP i/N done.
+  - Implementer handoff Demo Manifest block; tester per-step feedback template.
+Module boundaries and contracts:
+  - Follow docs/display_visual_demo_protocol.md as normative source.
+  - Demo steps call app_core_display_show_* only (same delivery path as production).
+  - Max 4 steps, max 30 s total hold.
+Detailed behavior:
+  - Kconfig y: steps FULL_FOUR_LINES (5s), QR_SETUP (8s), FULL_TWO_LINES (5s).
+  - Kconfig n: smoke only — single FULL_FOUR_LINES screen, no step cycling.
+Non-goals:
+  - Serial CLI to trigger demos; menus; automated OCR.
+Acceptance criteria:
+  - Protocol doc and test_strategy criteria present.
+  - Firmware builds with demo wired; serial grep shows DEMO_STEP 1/3 through 3/3.
+  - Implementer handoff includes filled Demo Manifest for DISPLAY_VISUAL_DEMO_PROTOCOL.
+Constraints:
+  - Do not add display_controller callers outside app_core.
+Validation plan:
+  - Tester Run 006: flash with Kconfig y, human observes each step, feedback.md entry.
+Open questions:
+  - None.
+```
+
+## ARCHITECT_ROLE_HARD_STOP
+
+```text
+ID: ARCHITECT_ROLE_HARD_STOP
+Objective:
+  Enforce stricter architect role separation: no firmware edits, no builds, clear
+  override hierarchy over plans and generic instructions.
+Reason:
+  Architect session crossed into components/ and idf.py despite existing role guides.
+Authorized files:
+  - docs/architect_role_hard_stop.md
+  - docs/methodology.md (hard stop references)
+  - AGENTS.md (Architect hard stop section)
+  - agent-workspaces/architect/ROLE.md
+  - agent-workspaces/architect/decisions.md
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/implementer/ROLE.md (one-line cross-reference only)
+Expected changes:
+  - Canonical hard stop doc with forbidden paths, commands, override table, checklist.
+  - ROLE.md hard stop summary at top.
+  - AGENTS.md ownership aligned to docs/**; role switch requires named role.
+Explicitly excluded (implementer / tester):
+  - components/**, main/**, sdkconfig*, idf.py, flash, formal test runs
+Module boundaries and contracts:
+  - docs/architect_role_hard_stop.md is normative for architect sessions.
+  - Mixed plans: architect slice = docs + handoff only.
+Acceptance criteria:
+  - Hard stop doc exists and is linked from ROLE.md, AGENTS.md, methodology.md.
+  - Decision recorded in decisions.md.
+  - No firmware or build changes in this handoff execution.
+Validation plan:
+  - Reviewer confirms architect agent can cite hard stop when asked to implement code.
+Open questions:
+  - None.
+```
+
 ## Template
 
 ```text

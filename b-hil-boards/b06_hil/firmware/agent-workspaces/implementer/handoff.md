@@ -16,10 +16,9 @@ Before starting any task in this file, run the **Role Boundary Check**:
 
 - `OLED_TEXT_DISPLAY_INTERFACE`: display stack + SSD1306 driver over I2C phase 2.
 - `I2C_BUS_ARCHITECTURE` phase 1 and `I2C_BUS_PHASE2`: done.
-- `DISPLAY_DELIVERY_CONTRACT`: **not implemented** (app_core still calls
-  `display_controller_*` directly; no callback API yet).
-- `QR_ENCODER_INTERFACE`: **not implemented** (`display_qr` stub; no `setup_url`;
-  no Nayuki vendor tree).
+- `DISPLAY_DELIVERY_CONTRACT`: **implemented** (`app_core_display_show_*`; sole caller).
+- `QR_ENCODER_INTERFACE`: **implemented** (Nayuki qrcodegen, `setup_url`, real `display_qr`).
+- `DISPLAY_VISUAL_DEMO_PROTOCOL`: **documented** (protocol + handoff); **firmware pending implementer**.
 - Physical OLED controller for v1: **SSD1306** (128x64 I2C). No SH1106 work unless
   hardware changes.
 
@@ -29,11 +28,28 @@ Normative docs:
 - `docs/qr_encoder_interface.md`
 - `docs/oled_text_display_interface.md`
 - `docs/test_strategy.md`
+- `docs/display_visual_demo_protocol.md`
+
+## Display Visual Demo (mandatory for display handoffs)
+
+Copy this block into every display-related handoff completion. Do not set
+`Ready for tester: Yes` without a filled manifest.
+
+```text
+Handoff ID:
+Kconfig: CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO=y
+Total hold (s):
+Commands: idf.py build && idf.py flash && idf.py monitor
+Observation window (s): total hold + ~5
+
+Step | name= | API | Payload / lines | Hold (s) | Human expects on OLED
+1    |       |     |                 |          |
+```
 
 ## Next Tasks (simple order)
 
-Execute in order unless a task is already done. Do not start `I2C_BUS_PHASE3`
-unless a new architect handoff activates it.
+Tasks 1–5 below are **complete**. Do not start `I2C_BUS_PHASE3` unless a new
+architect handoff activates it.
 
 ### Task 1 — `setup_url` component
 
@@ -143,6 +159,99 @@ unless a new architect handoff activates it.
 **Done when:** Tester can run checklist in `docs/test_strategy.md` (Display Delivery +
 QR Encoder sections).
 
+**Status:** Complete (2026-06-22). See handoff records below.
+
+---
+
+## DISPLAY_VISUAL_DEMO_PROTOCOL (pending — implementer)
+
+Architect handoff and `docs/display_visual_demo_protocol.md` are ready. **Do not**
+mark complete until firmware exists.
+
+**Implementer tasks:**
+
+1. Add `components/app_core/Kconfig` → `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` (default `y`).
+2. Add `app_core_display_demo.c` / `.h` with `app_core_run_visual_demo()` and smoke helper.
+3. Wire `app_core_start()` per protocol (`#if CONFIG_...`).
+4. Set `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO=y` in `sdkconfig.defaults`.
+5. Fill **Display Visual Demo** manifest below; set `Ready for tester: Yes` only after build.
+
+### Display Visual Demo (target manifest — copy when implemented)
+
+```text
+Handoff ID: DISPLAY_VISUAL_DEMO_PROTOCOL
+Kconfig: CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO=y
+Total hold (s): 18
+Commands: idf.py build && idf.py flash && idf.py monitor
+Observation window (s): ~23
+
+Step | name= | API | Payload / lines | Hold (s) | Human expects on OLED
+1 | FULL_FOUR_LINES | app_core_display_show_template | b06_hil, READY, v0.1, "" | 5 | Three text lines; fourth empty
+2 | QR_SETUP | app_core_display_show_qr_setup | http://192.168.4.1, SCAN, ME | 8 | QR left, text right; phone scans URL
+3 | FULL_TWO_LINES | app_core_display_show_template | TEXT, ONLY | 5 | Two lines only; no QR pixels remain
+```
+
+Ready for tester: **No** (firmware not implemented).
+
+---
+
+## DISPLAY_DELIVERY_CONTRACT
+
+```text
+ID: DISPLAY_DELIVERY_CONTRACT
+Source handoff: agent-workspaces/architect/handoff.md, docs/display_delivery_contract.md
+Summary:
+  - app_core_display_show_template and app_core_display_show_qr_setup in app_core.h
+  - QR validated with setup_url_validate before display_controller_show_qr_setup
+  - app_core_start demo uses app_core_display_show_template
+  - display_controller.h included only from app_core and display internals
+Modified files:
+  - components/app_core/include/app_core.h
+  - components/app_core/app_core.c
+  - components/app_core/CMakeLists.txt
+Commands executed:
+  - grep audit for display_controller.h callers
+Build result:
+  - Included in QR integration build (see QR_ENCODER_INTERFACE)
+Questions or technical debt:
+  - Instruction source identity still TBD (may live inside app_core).
+Ready for tester:
+  Yes. Validate callback path and invalid QR rejection at app_core.
+```
+
+## QR_ENCODER_INTERFACE
+
+```text
+ID: QR_ENCODER_INTERFACE
+Source handoff: agent-workspaces/architect/handoff.md, docs/qr_encoder_interface.md
+Summary:
+  - components/setup_url with format_ipv4, validate, setup_url_self_test at boot
+  - components/qr_encoder/vendor/qrcodegen (Nayuki MIT)
+  - display_qr_generate uses qrcodegen_encodeBinary, EC LOW, version 1-2
+  - display_controller_show_template rejects DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT
+  - QR only via display_controller_show_qr_setup / app_core_display_show_qr_setup
+Nayuki pin:
+  - Repository: https://github.com/nayuki/QR-Code-generator
+  - Branch: master
+  - File blob: qrcodegen.c sha 34f1002501fa2bcb0a054f4311795b8cbb977f5b
+Modified files:
+  - components/setup_url/
+  - components/qr_encoder/
+  - components/display/display_qr.c
+  - components/display/display_controller.c
+  - components/display/CMakeLists.txt
+Commands executed:
+  - idf.py build (esp32c3)
+Build result:
+  - Success (ESP-IDF 5.3.4, target esp32c3)
+  - b06_hil_firmware.bin before QR integration: 0x34de0 bytes (I2C phase 2)
+  - b06_hil_firmware.bin after QR integration: 0x39f00 bytes (+0x4120)
+Questions or technical debt:
+  - Hardware QR scan not verified by implementer (tester task).
+Ready for tester:
+  Yes. Run docs/test_strategy.md Display Delivery + QR Encoder sections on device.
+```
+
 ---
 
 ## Rules (do not guess)
@@ -240,9 +349,9 @@ Physical controller (v1): SSD1306 — confirmed; no SH1106 planned.
 Modified files:
   - components/display/
 Questions or technical debt:
-  - Tasks 1–5 in Next Tasks section above.
+  - None for display delivery scope.
 Ready for tester:
-  Yes for SSD1306 output and geometry; QR scan after Task 4–5.
+  Yes for full display v1 stack including QR encode path.
 ```
 
 ## Template

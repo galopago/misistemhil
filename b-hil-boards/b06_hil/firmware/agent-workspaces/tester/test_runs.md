@@ -178,3 +178,53 @@ Conclusion:
   Operator confirmed demo text on physical OLED (3 visible lines; 4th line empty).
   Deferred: concurrent two-task contention, timeout recovery, OLED-absent path.
 ```
+
+### Run 005 — DISPLAY_DELIVERY_CONTRACT + QR_ENCODER_INTERFACE validation
+
+```text
+Date: 2026-06-22
+Firmware: commit 18452bfa478918151bc0589d2401fde9850b6013-dirty
+Handoffs: DISPLAY_DELIVERY_CONTRACT, QR_ENCODER_INTERFACE
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini on /dev/ttyACM0, OLED at 0x3C
+Commands:
+  idf.py build
+  idf.py -p /dev/ttyACM0 flash
+  Host test: gcc /tmp/qr_host_test (setup_url + display_qr + Nayuki qrcodegen)
+  Serial capture 115200 / 15s -> /tmp/b06_hil_boot_log_run005.txt
+  Static audit: grep display_controller.h, esp_wifi in app_core/display
+Result:
+  Build: PASS (b06_hil_firmware.bin 0x39f00 bytes, matches implementer handoff)
+  Flash: PASS
+  On-device setup_url_self_test: PASS
+  On-device display_geometry_self_test: PASS
+  SSD1306 init + stable display_task: PASS
+  Host setup_url + display_qr matrix tests: PASS (width 25/21, reject https/path/null)
+  Caller discipline grep: PASS (display_controller.h only in app_core + display/)
+  No WiFi/esp_event in app_core or display: PASS
+  No hardcoded setup URL in display_controller: PASS
+  app_core uses app_core_display_show_template at boot: PASS (delivery callback path)
+  QR_LEFT_TEXT_RIGHT via show_template: PASS (code rejects ESP_ERR_INVALID_ARG)
+  QR hardware scan (QR_LEFT_TEXT_RIGHT on panel): NOT EXERCISED (boot shows text demo only)
+  Invalid QR rejection on device: NOT EXERCISED (no runtime trigger in boot image)
+  Layout templates FULL_TWO_LINES / TOP_TWO_BOTTOM_ONE on hardware: NOT EXERCISED
+Logs:
+  I (330) display_geom: Display geometry self-test passed
+  I (340) setup_url: self-test passed
+  I (340) app_core: OLED detected at I2C address 0x3C
+  I (350) display_driver: SSD1306 initialized at I2C address 0x3C
+  I (360) display_task: Display task started
+  App version: 18452bf-dirty (Jun 22 2026 09:38:10)
+  (no panic / reboot loop in 15s)
+Host test output:
+  PASS setup_url_self_test
+  PASS qr 192.168.4.1 (width 25)
+  PASS qr 1.1.1.1 (width 21)
+  PASS reject null, empty, https, path
+Nayuki pin: qrcodegen.c sha 34f1002501fa2bcb0a054f4311795b8cbb977f5b (per implementer handoff)
+Conclusion:
+  PASS for QR encoder, setup_url, display delivery contract (static + on-device self-tests),
+  and regression of SSD1306 text demo boot path.
+  QR scannable hardware test and alternate layout templates require a boot demo hook or
+  manual invocation of app_core_display_show_qr_setup — not present in current app_core_start.
+```

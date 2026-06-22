@@ -469,3 +469,68 @@ Validation expectations:
 Open questions:
   - None.
 ```
+
+## 2026-06-20 — Display Visual Demo Protocol
+
+```text
+Date: 2026-06-20
+Decision: Boot-time OLED demo-test gated by CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO.
+Context: Display work was validated on host and serial but QR hardware scan and
+  per-step human observation were not repeatable. Tester Run 005 noted the gap.
+Implementation contract:
+  - docs/display_visual_demo_protocol.md is normative.
+  - app_core_run_visual_demo() in app_core_display_demo.c; max 4 steps, 30 s hold.
+  - Serial markers DEMO_STEP i/N for grep-friendly evidence.
+  - Implementer copies Demo Manifest into handoff; tester records per-step feedback.
+Expected behavior:
+  - Kconfig y: baseline v1 sequence (four lines, QR setup, two lines).
+  - Kconfig n: smoke-only single four-line screen at boot.
+Non-goals:
+  - Serial CLI demo trigger; automated camera OCR.
+Affected files:
+  - docs/display_visual_demo_protocol.md
+  - components/app_core/
+  - sdkconfig.defaults
+  - agent-workspaces/implementer/handoff.md
+  - agent-workspaces/tester/feedback.md
+Validation expectations:
+  - Tester Run 006 with human QR scan and per-step PASS/FAIL in feedback.md.
+Open questions:
+  - None.
+```
+
+## 2026-06-20 — Architect Role Hard Stop
+
+```text
+Date: 2026-06-20
+Decision: Architect must never edit firmware or run builds; override hierarchy is
+  documented and outranks plans, todos, and generic user instructions.
+Context: An architect session edited components/ and ran idf.py while executing a
+  mixed plan that included implementer code todos, despite prior role boundary rules.
+Alternatives considered:
+  - Rely on existing ROLE.md questions only.
+  - Add repo-root .cursor/rules (rejected; firmware-only scope).
+Implementation contract:
+  - docs/architect_role_hard_stop.md is the canonical hard stop.
+  - architect/ROLE.md, AGENTS.md, and methodology.md reference it.
+  - Plans and "complete all todos" do not authorize firmware for architect.
+  - Role switch requires explicit named role (implementer / tester).
+Expected behavior:
+  - Architect completes docs and handoffs only from mixed plans.
+  - Code tasks are recorded as pending for implementer, not executed.
+Non-goals:
+  - Changing implementer or tester role boundaries in this decision.
+Consequences:
+  - Architect may refuse code/build steps without asking permission to violate rules.
+Affected files:
+  - docs/architect_role_hard_stop.md
+  - agent-workspaces/architect/ROLE.md
+  - firmware/AGENTS.md
+  - docs/methodology.md
+  - agent-workspaces/architect/decisions.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - No architect session edits components/ or runs idf.py unless human names role switch.
+Open questions:
+  - None.
+```

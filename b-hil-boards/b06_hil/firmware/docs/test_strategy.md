@@ -161,6 +161,51 @@ Validation follows `docs/display_delivery_contract.md`.
 - No test shall poll for pending instructions.
 - No test shall couple display behavior to WiFi/network state.
 
+## Display Visual Demo Criteria
+
+Validation follows `docs/display_visual_demo_protocol.md`.
+
+### When required
+
+- Any handoff that touches display rendering, layouts, QR, or `app_core` display
+  delivery MUST include an implementer **Demo Manifest** and firmware with the
+  boot demo wired under `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO`.
+
+### Kconfig
+
+- Record `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` value (`y` or `n`) in the test run.
+- When `y`: execute full manifest steps on hardware with human observation.
+- When `n`: multi-step demo is **BLOCKED**; smoke-only (single four-line screen)
+  may be noted separately. Do not infer PASS for QR or layout transitions from
+  prior runs.
+
+### Per-step checklist
+
+For each manifest step:
+
+| Field | Requirement |
+| --- | --- |
+| Serial | `DEMO_STEP i/N name=<id> hold_ms=<ms>` then `DEMO_STEP i/N done` in order |
+| Expected | Copied from implementer Demo Manifest |
+| Observed | Human operator description |
+| Result | PASS, FAIL, or BLOCKED |
+
+### Baseline v1 acceptance (when Kconfig `y`)
+
+- Step `FULL_FOUR_LINES`: three visible lines `b06_hil`, `READY`, `v0.1`.
+- Step `QR_SETUP`: QR visible on left; phone scans `http://192.168.4.1`.
+- Step `FULL_TWO_LINES`: text only; no residual QR pixels.
+
+### Visual demo test record additions
+
+When validating display work, extend the test run record with:
+
+- Handoff ID and manifest step count.
+- `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` value.
+- Serial grep evidence for `DEMO_STEP` (file path or snippet).
+- Link to `agent-workspaces/tester/feedback.md` entry with per-step results.
+- Whether QR was verified by camera/scanner on device.
+
 ## I2C Bus Criteria
 
 I2C validation follows the incremental phases in

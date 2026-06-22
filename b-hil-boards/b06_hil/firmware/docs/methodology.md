@@ -50,6 +50,11 @@ before handoff, or leave the item explicitly blocked as an open question.
 or flash hardware, and does **not** write tester validation reports. If asked to
 do those, stop and redirect to the implementer or tester.
 
+**Hard stop:** Obey [`docs/architect_role_hard_stop.md`](architect_role_hard_stop.md).
+Plans, todos, and phrases such as *implement the plan* or *complete all todos*
+do **not** override this. Document Kconfig symbols and demo manifests in
+handoff; **creating** Kconfig entries and source files is implementer work.
+
 ### Implementer
 
 Turns the handoff into buildable firmware:
@@ -101,6 +106,8 @@ flowchart TD
 - If an unexpected file appears, update the handoff before touching it.
 - If a plan or user message assigns work outside the active role, question it
   and ask the human to confirm the correct agent before continuing.
+- **A plan or todo list never overrides the architect hard stop** (see
+  `docs/architect_role_hard_stop.md`).
 - Changes to `components/board/` require confirmation against the schematic.
 - Changes to `sdkconfig.defaults` must explain the reason.
 
@@ -112,6 +119,11 @@ A task is ready for the tester when:
 - It has implementation notes.
 - It includes verifiable acceptance criteria.
 - It leaves no hardware assumptions unmarked as `TODO(b06-hil):`.
+- If the handoff affects the display, the implementer handoff includes a
+  **Display Visual Demo** manifest per `docs/display_visual_demo_protocol.md`
+  and firmware with `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` documented.
+  Architect may **specify** the manifest and Kconfig symbol in docs/handoff;
+  implementer **creates** the Kconfig file and source.
 
 A task is ready for the implementer only when the architect handoff is
 implementation-ready: expected files, module contracts, behavior, constraints,

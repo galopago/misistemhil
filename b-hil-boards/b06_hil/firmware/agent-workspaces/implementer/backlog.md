@@ -5,13 +5,8 @@ maintained in English.
 
 ## Pending (authorized now)
 
-Execute in order — details in `handoff.md` → **Next Tasks**:
-
-1. **setup_url** — `components/setup_url/` per `docs/qr_encoder_interface.md`.
-2. **DISPLAY_DELIVERY** — `app_core_display_show_*` callbacks; sole display caller.
-3. **DISPLAY_FIX** — remove hardcoded URL in `display_controller_show_template` QR branch.
-4. **QR_ENCODER** — Nayuki vendor + real `display_qr_generate`.
-5. **QR_INTEGRATION** — build, flash/RAM note, hardware QR scan test for tester.
+- `DISPLAY_VISUAL_DEMO_PROTOCOL`: Kconfig + `app_core_display_demo.c` per
+  `docs/display_visual_demo_protocol.md` and architect handoff.
 
 ## Pending (not authorized yet)
 
@@ -21,6 +16,8 @@ Execute in order — details in `handoff.md` → **Next Tasks**:
 
 ## Completed
 
+- `DISPLAY_DELIVERY_CONTRACT`: app_core display callback API.
+- `QR_ENCODER_INTERFACE`: setup_url, Nayuki qrcodegen, display_qr_generate.
 - `I2C_BUS_ARCHITECTURE` phase 1: shared bus, board helper, app_core startup.
 - `I2C_BUS_PHASE2`: `i2c_bus_transceive`, bus mutex, SSD1306 via transceive.
 - `OLED_TEXT_DISPLAY_INTERFACE` base stack (renderer, task, SSD1306 when OLED present).

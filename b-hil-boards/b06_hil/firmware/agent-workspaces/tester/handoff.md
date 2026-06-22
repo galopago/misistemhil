@@ -14,9 +14,38 @@ Before starting any task in this file, run the **Role Boundary Check**:
 
 ## Current Status
 
-`I2C_BUS_PHASE2` hardware validation (Run 004): **PASS** including human visual
-sign-off. OLED shows demo lines `b06_hil`, `READY`, `v0.1` (left-aligned). Concurrent
-two-task and timeout tests still deferred (no second I2C consumer / harness).
+Run 005: **PASS** for `DISPLAY_DELIVERY_CONTRACT` and `QR_ENCODER_INTERFACE`.
+**DISPLAY_VISUAL_DEMO_PROTOCOL**: pending tester Run 006 (boot demo with Kconfig `y`
+exercises QR on hardware). See implementer handoff for Demo Manifest.
+
+## DISPLAY_DELIVERY_CONTRACT + QR_ENCODER_INTERFACE
+
+```text
+ID: DISPLAY_DELIVERY_CONTRACT, QR_ENCODER_INTERFACE
+Source: agent-workspaces/implementer/handoff.md, docs/test_strategy.md
+Commands executed:
+  idf.py build && idf.py flash
+  Host qr_host_test (setup_url + display_qr)
+  Serial capture + grep audit
+Hardware used:
+  ESP32-C3 SuperMini, OLED @ 0x3C
+Result:
+  Build/flash/boot: PASS (0x39f00)
+  setup_url on-device self-test: PASS
+  display_qr host matrix tests: PASS
+  Delivery caller grep: PASS
+  SSD1306 + four-line demo boot: PASS (serial; visual from Run 004)
+  QR scan on physical OLED: NOT EXERCISED
+  Invalid QR at runtime: NOT EXERCISED
+Reproducible failures:
+  None in Run 005.
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 005
+  /tmp/b06_hil_boot_log_run005.txt
+Recommendation:
+  Accept encoder and delivery contract for v1. Run 006: visual demo protocol
+  per docs/display_visual_demo_protocol.md (QR on hardware).
+```
 
 ## I2C_BUS_PHASE2
 
@@ -121,8 +150,14 @@ ID:
 Source:
 Commands executed:
 Hardware used:
+CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO: y | n
+Visual demo steps (per manifest):
+  Step 1 name= / Expected / Observed / PASS|FAIL|BLOCKED
+  Step 2 ...
 Result:
 Reproducible failures:
 Evidence:
+  feedback.md entry:
+  test_runs.md run:
 Recommendation:
 ```

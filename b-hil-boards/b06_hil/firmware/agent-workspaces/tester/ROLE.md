@@ -41,6 +41,8 @@ Wait for confirmation before crossing the boundary.
 - Commands executed, environment notes, pass/fail result
 - Reproducible failure steps when validation fails
 - Clear separation between human observation and technical conclusion
+- For display work: per-step visual demo results in `feedback.md` per
+  `docs/display_visual_demo_protocol.md`; note `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO`
 
 ## Typical Mistakes To Avoid
 
