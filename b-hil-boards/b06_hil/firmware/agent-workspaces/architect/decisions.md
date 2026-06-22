@@ -444,3 +444,28 @@ Validation expectations:
 Open questions:
   - None.
 ```
+
+## 2026-06-20 — SSD1306 OLED Controller for v1
+
+```text
+Date: 2026-06-20
+Decision: Use SSD1306 as the sole OLED controller driver for v1 firmware.
+Context: Bench hardware with the existing display_driver SSD1306 path already
+  produces correct 128x64 I2C output. No controller change is planned.
+Implementation contract:
+  - display_driver.c remains SSD1306-only.
+  - Do not implement SH1106 column offset or alternate init sequences unless
+    physical hardware changes.
+Expected behavior:
+  - OLED at 0x3C or 0x3D initializes and flushes via i2c_bus_transceive.
+Non-goals:
+  - SH1106 support, controller auto-detection, dual-driver abstraction.
+Affected files:
+  - components/display/display_driver.c
+  - docs/esp32_c3_supermini_connections.md
+  - agent-workspaces/implementer/handoff.md
+Validation expectations:
+  - Tester confirms visual output on current SuperMini + 0.96" I2C module.
+Open questions:
+  - None.
+```

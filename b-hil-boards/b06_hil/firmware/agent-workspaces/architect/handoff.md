@@ -142,10 +142,9 @@ Validation plan:
     QR fit behavior as described in `docs/test_strategy.md`.
   - Run the build using the locally installed ESP-IDF tools without committing
     workstation-specific absolute paths or generated environment files.
-  - Add hardware tests only after physical OLED driver/controller selection is
-    confirmed.
+  - Add hardware tests after physical OLED validation on the bench.
 Open questions:
-  - Confirm physical OLED controller/driver.
+  - None (SSD1306 confirmed for v1; see agent-workspaces/implementer/handoff.md).
 ```
 
 ## I2C_BUS_ARCHITECTURE

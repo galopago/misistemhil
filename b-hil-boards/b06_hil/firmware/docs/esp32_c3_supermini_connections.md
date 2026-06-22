@@ -31,6 +31,9 @@ The OLED driver or board configuration must allow either common OLED address:
 `0x3C` or `0x3D`. The firmware may select a configured address or probe only
 these two expected OLED addresses.
 
+**Controller IC (v1):** SSD1306, 128×64, I2C. Validated on bench hardware. SH1106
+is out of scope unless the physical module changes.
+
 ## Digestible Wiring Schematic
 
 ```text

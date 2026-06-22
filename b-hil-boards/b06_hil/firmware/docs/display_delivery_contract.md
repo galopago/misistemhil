@@ -197,7 +197,7 @@ Enforcement:
 - Multiple instructions MAY arrive close together. `display_task` coalesces to
   **latest wins**.
 - Screen priority (alert vs status vs QR) is decided in **`app_core`** before the
-  API call. Instruction sources supply intent; they do not call the display.
+  API call. v1 rule: **last instruction wins** (rely on display_task coalescing).
 
 ## Startup Order (canonical)
 
