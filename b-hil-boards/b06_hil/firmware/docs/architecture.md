@@ -13,6 +13,9 @@ Shared-document changes for the OLED display interface are motivated by
 Shared-document changes for I2C concurrency are motivated by
 `agent-workspaces/architect/handoff.md`, `I2C_BUS_CONCURRENCY`.
 
+Shared-document changes for the QR encoder are motivated by
+`agent-workspaces/architect/handoff.md`, `QR_ENCODER_INTERFACE`.
+
 ## Layers
 
 ```mermaid
@@ -46,6 +49,9 @@ flowchart TD
   transactions from multiple application tasks before they reach `i2c_bus`.
 - Display interface: conceptual visual stack for the 0.96 inch I2C OLED display.
   The visual contract is defined in `docs/oled_text_display_interface.md`.
+  QR matrix generation is defined in `docs/qr_encoder_interface.md`. Setup URLs
+  (`http://IPv4`) are produced outside the display controller and validated via
+  shared `setup_url` helpers.
   Implementation must keep display ownership in a controller/task boundary and
   must keep renderer/canvas logic independent from the physical I2C driver.
 - `tests/`: documentation and future host or hardware tests.
@@ -69,6 +75,8 @@ flowchart TD
 - Do not let application modules draw pixels directly. Application data must be
   routed to a display controller, which owns visual priority and sends complete
   display states or layouts to the display task.
+- QR codes are sporadic content, not a permanently reserved screen region. The
+  active layout may be text-only or include QR depending on application state.
 
 ## Toolchain Environment
 

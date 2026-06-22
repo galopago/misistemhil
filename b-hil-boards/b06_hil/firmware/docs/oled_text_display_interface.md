@@ -20,8 +20,9 @@ change at runtime. Common two-line and four-line screens are reference
 templates for estimating font size and information density, not rigid rendering
 modes.
 
-The base interface also supports constrained QR codes for short local setup
-payloads, such as captive portal or access point URLs.
+The base interface also supports constrained QR codes for local setup URLs in
+the product profile `http://IPv4`. Matrix generation is defined in
+`docs/qr_encoder_interface.md`; this document defines rendering and layout only.
 
 ## Scope
 
@@ -31,7 +32,8 @@ Included:
 - Minimal graphics primitives.
 - Region-based layout.
 - Text content rendering.
-- Constrained QR code rendering for short setup payloads.
+- Constrained QR code rendering for local setup URLs (`http://IPv4` product
+  profile).
 - Font selection rules based on available space.
 - Reference layout templates for common arrangements.
 - Runtime layout updates.
@@ -43,6 +45,8 @@ Included:
 Excluded:
 
 - A concrete I2C driver.
+- QR matrix encoding implementation details (see `docs/qr_encoder_interface.md`).
+- Network URL construction or IP discovery.
 - Dependencies on a concrete operating system, RTOS, SDK, or framework.
 - Electrical bus configuration.
 - Proprietary font details or graphics library details.
@@ -304,8 +308,9 @@ Invalid numeric dimensions MUST be handled through best-effort clipping.
 - For text regions, if a line does not define alignment or emphasis, it inherits
   from the text region.
 - QR payloads must use printable ASCII.
-- QR rendering is intended for short local setup URLs or similarly short
-  payloads.
+- In the `b06_hil` v1 product profile, QR payloads MUST be `http://` followed by
+  a valid IPv4 address. Payload strings are supplied by modules outside the
+  display controller; see `docs/qr_encoder_interface.md`.
 - QR rendering must not imply support for arbitrary images or general bitmap
   drawing.
 - The renderer should use best-effort rendering for malformed or partially
@@ -526,11 +531,16 @@ A monospaced or semi-monospaced font is preferred for visual stability.
 
 ## Canonical QR Rendering Algorithm
 
+QR matrix generation MUST follow `docs/qr_encoder_interface.md`. This section
+defines only how an already-generated matrix is drawn.
+
 QR regions MUST be generated from the payload string at render time or from a
 cached matrix derived from the same payload. Passing a pre-rendered bitmap into
 the display API is outside the base version.
 
-QR generation MUST use a standards-compliant QR Code encoder. Micro QR, rMQR,
+QR generation MUST use a standards-compliant QR Code encoder documented in
+`docs/qr_encoder_interface.md`. For `b06_hil`, the encoder is Nayuki `qrcodegen`
+(MIT). Micro QR, rMQR,
 Data Matrix, Aztec, or any other 2D code format MUST NOT be used in the base
 version.
 
@@ -597,6 +607,26 @@ The renderer must treat the screen as one or more rectangular regions. Each
 region may contain text or one constrained QR code. For text regions, the number
 of lines, region height, and selected font determine final text size.
 
+### Dynamic screen, sporadic QR
+
+The display is not partitioned into permanent zones such as “text area” and “QR
+area”. The full `128x64` surface is available to whichever `DisplayLayout` is
+active at that moment.
+
+Normative rules:
+
+- Layouts are replaced at runtime as application state changes.
+- Most of the time the screen may show text only (one line, two lines, four lines,
+  or other text arrangements).
+- A QR appears only when the active layout includes a `QR` region for that
+  refresh cycle.
+- Templates like `FULL_FOUR_LINES`, `FULL_TWO_LINES`, and `QR_LEFT_TEXT_RIGHT`
+  describe possible layouts, not simultaneous visible partitions.
+- `QR_LEFT_TEXT_RIGHT` MUST NOT be treated as a fixed split-screen mode that
+  always reserves the left half for QR.
+- When a new layout without QR regions is applied, the renderer clears the canvas
+  and draws only the new regions. Previous QR content MUST NOT persist.
+
 The active layout is data, not a compile-time decision. The application may send
 a new `DisplayLayout` at runtime when it needs to present text in a different
 form.
@@ -610,13 +640,15 @@ Expected text content includes:
 
 Expected QR content includes:
 
-- A short local setup URL.
-- A short captive portal URL.
-- A short local network address.
+- `http://aaa.bbb.ccc.ddd` local IPv4 setup URLs supplied by an external module.
 
-Reference templates are convenience examples. The core renderer must work from
-explicit regions so application code can define other arrangements without
-changing the display task or driver.
+Reference templates are convenience examples for common arrangements. They are not
+mandatory default screens and do not reserve screen area when another layout is
+active. The core renderer must work from explicit regions so application code can
+define other arrangements without changing the display task or driver.
+
+`QR_LEFT_TEXT_RIGHT` is one reference for a **temporary** setup-style screen. It
+must not be interpreted as a permanent QR slot on the display.
 
 The implementation should document at least these reference templates:
 
@@ -1187,6 +1219,8 @@ Expected behavior:
 
 ## Implementation Constraints For `b06_hil`
 
+- QR encoding must follow `docs/qr_encoder_interface.md`. The display controller
+  must not construct setup URLs from network state.
 - The initial implementation must not enable the I2C peripheral until the
   ESP32-C3 SuperMini pin map is confirmed against the schematic.
 - Hardware address, I2C bus, contrast, and orientation belong to driver or

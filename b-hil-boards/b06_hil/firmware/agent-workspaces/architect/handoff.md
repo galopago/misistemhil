@@ -19,13 +19,15 @@ Active handoffs:
 - `OLED_TEXT_DISPLAY_INTERFACE`
 - `I2C_BUS_ARCHITECTURE`
 - `I2C_BUS_CONCURRENCY`
+- `QR_ENCODER_INTERFACE`
 
 I2C pins, OLED address candidates, `INA219` addresses, error LED polarity, and
 factory reset switch polarity are recorded in
 `docs/esp32_c3_supermini_connections.md`. Generic shared I2C bus structure and
 incremental concurrency phases are recorded in
-`docs/i2c_bus_architecture.md`. The implementer must still keep physical OLED
-driver/controller selection isolated until confirmed.
+`docs/i2c_bus_architecture.md`. QR encoder rules and `http://IPv4` payload
+profile are recorded in `docs/qr_encoder_interface.md`. The implementer must
+still keep physical OLED driver/controller selection isolated until confirmed.
 
 ## OLED_TEXT_DISPLAY_INTERFACE
 
@@ -77,6 +79,8 @@ Detailed behavior:
     pins, I2C addresses, and active-low signal polarities.
   - The base display size is exactly 128x64.
   - Layouts are runtime data composed of explicit rectangular regions.
+  - The screen is fully dynamic: text-only layouts are normal; QR appears only when
+    the active layout includes a QR region (no permanently reserved QR area).
   - Text supports printable ASCII only, controlled truncation without ellipsis,
     LEFT/CENTER/RIGHT horizontal alignment, TOP/CENTER/BOTTOM vertical group
     alignment, and NORMAL/INVERTED emphasis.
@@ -88,6 +92,7 @@ Non-goals:
   - Do not implement icons, gauges, cursors, arbitrary bitmaps, widgets, Micro
     QR, Data Matrix, Aztec, scrolling text, animations, power management, or a
     platform-specific public visual contract.
+  - Do not treat QR_LEFT_TEXT_RIGHT as a fixed split-screen with permanent QR slot.
   - Do not let GPIO numbers or I2C addresses leak into renderer, canvas, visual
     state, or DisplayController logic.
 Acceptance criteria:
@@ -128,7 +133,6 @@ Validation plan:
     confirmed.
 Open questions:
   - Confirm physical OLED controller/driver.
-  - Confirm QR encoder dependency that fits firmware footprint and licensing.
 ```
 
 ## I2C_BUS_ARCHITECTURE
@@ -258,6 +262,70 @@ Validation plan:
   - Phase 4: debug counters match observed traffic.
 Open questions:
   - None.
+```
+
+## QR_ENCODER_INTERFACE
+
+```text
+ID: QR_ENCODER_INTERFACE
+Objective:
+  Define and implement QR matrix generation for local setup screens using the
+  http://IPv4 product payload profile and a permissive MIT-licensed encoder.
+Reason:
+  The display renderer already draws QR regions but the encoder is a stub.
+  Setup URLs must come from outside the display stack with shared validation.
+Authorized files:
+  - docs/qr_encoder_interface.md
+  - docs/oled_text_display_interface.md cross-references only
+  - docs/test_strategy.md
+  - components/qr_encoder/ and vendor Nayuki qrcodegen sources plus LICENSE
+  - components/setup_url/
+  - components/display/display_qr.c and include/display_qr.h
+  - tests/ for encoder and setup_url validation
+  - agent-workspaces/implementer/ for implementation notes
+Expected changes:
+  - Integrate Nayuki qrcodegen (MIT) under components/qr_encoder/vendor/.
+  - Implement display_qr_generate using byte mode and LOW error correction.
+  - Add setup_url_format_ipv4 and setup_url_validate for http://IPv4 only.
+  - Keep DisplayController payload input via display_controller_show_qr_setup.
+  - Do not move network IP discovery into display code.
+Module boundaries and contracts:
+  - Follow docs/qr_encoder_interface.md as normative source.
+  - External module (TBD) produces URL strings; setup_url validates/formats.
+  - display_qr owns matrix encoding only; renderer owns drawing.
+  - DisplayController owns fallback text when encode fails.
+Detailed behavior:
+  - Product payloads: http:// plus IPv4, length 14 to 22 chars, QR version 1 or 2.
+  - Version ceiling 2; payloads over 32 bytes after sanitize must fail.
+  - Static matrix buffer 25x25 in display_qr; no heap in v1.
+  - Only display_task may call display_qr_generate in v1.
+  - QR is sporadic: shown only when the active DisplayLayout includes a QR region.
+  - The screen is dynamic (text-only layouts are normal; QR layouts are occasional).
+  - No permanently reserved QR screen area; layout switches replace the full view.
+Non-goals:
+  - https, hostname, port, path, IPv6 payloads in v1.
+  - Hand-rolled QR encoding.
+  - Display-owned URL construction from network APIs.
+  - A fixed always-on QR panel or split-screen reserved for QR.
+Acceptance criteria:
+  - MIT LICENSE recorded in vendor tree.
+  - Canonical payloads encode to width 21 or 25 as documented.
+  - Invalid payloads return false and render blank QR regions.
+  - setup_url helpers pass tests in docs/test_strategy.md.
+  - Renderer remains free of Nayuki includes.
+Constraints:
+  - Encoder library must be MIT-licensed (Nayuki qrcodegen selected).
+  - Payload profile must not expand without a new architect handoff.
+Validation plan:
+  - Host or component tests for setup_url and display_qr_generate sizes.
+  - Hardware scan test of QR_LEFT_TEXT_RIGHT when OLED driver is active.
+  - Record measured flash/RAM after first integration.
+Open questions:
+  - External URL producer module name, location, and update event.
+  - Delivery contract from producer to display_controller_show_qr_setup.
+  - UX template when no valid IP is available.
+  - Refresh policy when IP changes (debounce, partial layout update).
+  - Confirm components/setup_url/ and vendor path at implementation time.
 ```
 
 ## Template

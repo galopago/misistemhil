@@ -12,6 +12,9 @@ Shared-document changes for the OLED display interface are motivated by
 Shared-document changes for I2C bus validation are motivated by
 `agent-workspaces/architect/handoff.md`, `I2C_BUS_CONCURRENCY`.
 
+Shared-document changes for QR encoder validation are motivated by
+`agent-workspaces/architect/handoff.md`, `QR_ENCODER_INTERFACE`.
+
 ## Levels
 
 - Build: `idf.py build`.
@@ -77,6 +80,50 @@ Golden tests should verify deterministic geometry even if selected fonts make
 pixel-perfect text output platform-specific. At minimum, they must verify
 region coordinates, clipped rectangles, line band heights, draw order, inverted
 band fill behavior, QR scale fallback, and QR placement.
+
+## QR Encoder Criteria
+
+QR encoding validation follows `docs/qr_encoder_interface.md`. Rendering-only
+tests remain under OLED Display Criteria above.
+
+### setup_url utility
+
+- `setup_url_validate("http://192.168.4.1")` returns true.
+- `setup_url_validate("http://255.255.255.255")` returns true.
+- `setup_url_validate("https://192.168.4.1")` returns false.
+- `setup_url_validate("http://192.168.1.1/setup")` returns false.
+- `setup_url_format_ipv4(192, 168, 4, 1, buf, len)` writes `http://192.168.4.1`.
+
+### Matrix generation
+
+- `display_qr_generate("http://192.168.4.1")` succeeds with `width == 25`.
+- `display_qr_generate("http://1.1.1.1")` succeeds with `width == 21`.
+- Empty, null, or invalid product payloads return false without crash.
+- Encoded product payloads fit in `64x64` at scale 2 with quiet zone 1.
+
+### Integration with renderer
+
+- `QR_LEFT_TEXT_RIGHT` with canonical payload renders a scannable code on hardware
+  when the physical OLED driver is active.
+- Invalid payload leaves the QR region blank; fallback text comes from
+  `DisplayController`, not the renderer.
+- Switching from a QR layout to a text-only layout removes all QR pixels; the
+  display must not keep a reserved QR zone between layouts.
+
+### Dynamic layout behavior
+
+- Text-only layouts (`FULL_FOUR_LINES`, `FULL_TWO_LINES`, single-line layouts) are
+  valid default states with no QR region.
+- QR layouts are occasional; tests must include at least one layout transition
+  away from QR to text-only.
+
+### QR test record additions
+
+When validating QR encoder work, extend the test run record with:
+
+- Nayuki vendor version or commit pin.
+- Payload strings exercised.
+- Whether encode was host-only or verified by camera/scanner on device.
 
 ## I2C Bus Criteria
 

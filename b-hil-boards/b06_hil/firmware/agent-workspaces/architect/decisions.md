@@ -134,3 +134,72 @@ Validation expectations:
 Open questions:
   - None.
 ```
+
+## 2026-06-20 — QR Encoder Product Profile
+
+```text
+Date: 2026-06-20
+Decision: Define QR encoder around http://IPv4 setup URLs, Nayuki qrcodegen (MIT),
+  external payload ownership, and shared setup_url validation.
+Context: Setup screens need scannable local URLs without coupling display to
+  network stack or restrictive encoder licenses.
+Alternatives considered:
+  - libqrencode (LGPL) — rejected for license restrictiveness.
+  - Display-owned URL formatting from netif — rejected; payload comes from outside.
+  - Validation only in external module — rejected; user chose shared setup_url.
+Implementation contract:
+  - docs/qr_encoder_interface.md is normative for encoder behavior.
+  - Payload profile v1: http://aaa.bbb.ccc.ddd only, QR version 1 or 2, byte mode,
+    EC LOW.
+  - Library: Nayuki qrcodegen, MIT, under components/qr_encoder/vendor/.
+  - setup_url shared helpers for format and validate.
+Expected behavior:
+  - display_controller_show_qr_setup receives externally supplied payload.
+  - display_qr_generate produces 21x21 or 25x25 matrices for canonical URLs.
+Non-goals:
+  - https, hostname, port, path, IPv6 in v1 product profile.
+Consequences:
+  - Open question on encoder library closed in OLED handoff.
+  - Implementer handoff QR_ENCODER_INTERFACE authorizes integration work.
+Affected files:
+  - docs/qr_encoder_interface.md
+  - docs/oled_text_display_interface.md
+  - docs/test_strategy.md
+  - docs/architecture.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - Tests in docs/test_strategy.md QR Encoder Criteria section.
+Open questions:
+  - External URL producer module and delivery contract to display.
+  - UX without valid IP and refresh-on-change policy.
+```
+
+## 2026-06-20 — Sporadic QR on Dynamic Layouts
+
+```text
+Date: 2026-06-20
+Decision: QR is occasional content on a fully dynamic display, not a permanent
+  reserved screen area.
+Context: The product alternates between text-only screens and rare setup screens
+  that include a QR region.
+Implementation contract:
+  - docs/qr_encoder_interface.md and docs/oled_text_display_interface.md state
+    that layouts replace atomically at runtime.
+  - QR_LEFT_TEXT_RIGHT is a reference template only, not a fixed split-screen mode.
+  - Encoder runs only when the active layout contains a QR region.
+Expected behavior:
+  - Text-only layouts are normal operating mode.
+  - Switching away from a QR layout leaves no QR artifacts on screen.
+Non-goals:
+  - Always-visible QR panel or dedicated QR real estate on every screen.
+Affected files:
+  - docs/qr_encoder_interface.md
+  - docs/oled_text_display_interface.md
+  - docs/test_strategy.md
+  - docs/architecture.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - Tester verifies layout switch QR to text-only clears QR pixels.
+Open questions:
+  - None.
+```
