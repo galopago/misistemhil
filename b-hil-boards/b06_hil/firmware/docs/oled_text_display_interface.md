@@ -115,6 +115,40 @@ outside this specification.
 
 Other display resolutions are outside the scope of this base specification.
 
+## Character Set Policy (v1 Product)
+
+For `b06_hil` v1, on-screen text and QR payloads use **printable ASCII only**
+(code points `0x20` through `0x7E`, space through tilde).
+
+Product rules:
+
+- Do **not** use accented letters, tildes on vowels, n-with-tilde, or other
+  language-specific letters in display strings for v1.
+- Do **not** use symbols, emoji, or text in other languages/scripts (Cyrillic,
+  CJK, Arabic, etc.) in v1 product copy shown on the OLED.
+- Application and controller code SHOULD supply ASCII-only strings. Callers must
+  not rely on the renderer to transliterate Spanish or other languages.
+- When input contains a character outside printable ASCII, or a character for
+  which the active font has no glyph, the renderer MUST replace it with `?` via
+  `sanitize_ascii` (one `?` per unsupported character). This is the only v1
+  fallback; there is no icon or alternate glyph substitution.
+- Multi-byte UTF-8 sequences for non-ASCII characters MUST NOT be interpreted as
+  single display characters in v1; each invalid byte or non-ASCII code unit is
+  handled by the sanitization rules above.
+
+Examples:
+
+| Input | Rendered |
+| --- | --- |
+| `READY` | `READY` |
+| `cafe` | `cafe` |
+| `café` | `caf?` |
+| `Espana` | `Espana` |
+| `España` | `Espa?a` |
+
+UTF-8, Unicode fonts, locale-aware shaping, and right-to-left text remain out of
+scope until a future architect handoff authorizes a new character-set profile.
+
 ## Expected Architecture
 
 The solution must be split into five conceptual layers:
@@ -289,10 +323,12 @@ Invalid numeric dimensions MUST be handled through best-effort clipping.
 - Each region owns its rectangle and its own content.
 - A region renders either text or a QR code in the base version.
 - Each `TextLine.text` contains displayable characters only.
+- Character set policy for v1 is defined in **Character Set Policy (v1 Product)**
+  above: printable ASCII only; unsupported characters become `?`.
 - The base character set is printable ASCII only, from space `0x20` through
   tilde `0x7E`.
 - Accented characters, n-with-tilde characters, Unicode symbols, and custom
-  glyphs are outside the base version.
+  glyphs are outside v1; callers must not depend on them appearing correctly.
 - The base version must not reserve space for icons, indicators, cursors, or
   side widgets.
 - `INVERTED` emphasis must be supported at region level and line level.
@@ -1227,6 +1263,9 @@ Expected behavior:
 
 ## Implementation Constraints For `b06_hil`
 
+- On-screen copy for v1 is printable ASCII only. Do not use tildes, accented
+  letters, or non-English scripts in product strings; unsupported input is
+  sanitized to `?` per Character Set Policy (v1 Product).
 - QR encoding must follow `docs/qr_encoder_interface.md`. The display controller
   must not construct setup URLs from network state.
 - The initial implementation must not enable the I2C peripheral until the

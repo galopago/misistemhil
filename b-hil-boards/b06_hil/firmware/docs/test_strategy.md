@@ -69,6 +69,8 @@ Host or component tests for the OLED implementation must cover:
 - Pixel-based text truncation when measurement is available, with no ellipsis.
 - ASCII sanitization by replacing non-printable or non-ASCII characters with
   `?`.
+- Product strings for v1 should be ASCII-only at the source; if `café` is passed,
+  rendered output is `caf?` (see Character Set Policy in the OLED contract).
 - Region-level and line-level `INVERTED` emphasis.
 - Separator rendering with separators enabled and disabled.
 - QR generation from short printable ASCII payloads using regular QR Code with

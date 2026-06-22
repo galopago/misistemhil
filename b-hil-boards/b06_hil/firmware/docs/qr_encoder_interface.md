@@ -14,6 +14,9 @@ product payload is a fixed-format HTTP URL pointing at a local IPv4 address.
 The display stack must not own network logic or URL construction. An external
 module supplies the payload string; shared validation lives in `setup_url`.
 
+Display text and QR payloads follow the printable ASCII v1 character policy in
+`docs/oled_text_display_interface.md` (unsupported characters become `?`).
+
 ## Sporadic QR Usage and Dynamic Display
 
 QR is **occasional**, not a permanent reserved area on the screen.

@@ -219,6 +219,34 @@ Open questions:
   - None.
 ```
 
+## 2026-06-20 — Printable ASCII Only (v1 Character Set)
+
+```text
+Date: 2026-06-20
+Decision: v1 on-screen text and QR payloads use printable ASCII only. No tildes,
+  accented letters, special symbols outside ASCII, or other languages/scripts in
+  product copy.
+Context: User confirmed Spanish accents and multilingual display are not needed
+  for now. Unsupported characters sanitize to ? at render time.
+Implementation contract:
+  - docs/oled_text_display_interface.md section Character Set Policy (v1 Product).
+  - sanitize_ascii replaces non-printable and non-ASCII input with ?.
+Expected behavior:
+  - Callers should supply ASCII-only strings (e.g. Espana not Espana-with-tilde).
+  - If non-ASCII is passed, deterministic ? replacement (e.g. cafe-with-accent -> caf?).
+Non-goals:
+  - UTF-8 decoding, Unicode fonts, locale shaping, RTL, emoji, custom glyph packs.
+Affected files:
+  - docs/oled_text_display_interface.md
+  - docs/architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - Host tests verify sanitize / render replaces accented input with ?.
+Open questions:
+  - None.
+```
+
 ## 2026-06-20 — Sporadic QR on Dynamic Layouts
 
 ```text

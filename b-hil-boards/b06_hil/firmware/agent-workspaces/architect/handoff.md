@@ -84,6 +84,8 @@ Detailed behavior:
   - Text supports printable ASCII only, controlled truncation without ellipsis,
     LEFT/CENTER/RIGHT horizontal alignment, TOP/CENTER/BOTTOM vertical group
     alignment, and NORMAL/INVERTED emphasis.
+  - v1 product copy must not use tildes, accented letters, or non-English scripts;
+    sanitize unsupported characters to ? per oled_text_display_interface.md.
   - QR regions generate regular QR Code matrices from sanitized payload text
     using LOW error correction and scale 2 with scale 1 fallback.
   - Null, malformed, out-of-bounds, overlapping, or oversized inputs must follow
@@ -93,6 +95,7 @@ Non-goals:
     QR, Data Matrix, Aztec, scrolling text, animations, power management, or a
     platform-specific public visual contract.
   - Do not treat QR_LEFT_TEXT_RIGHT as a fixed split-screen with permanent QR slot.
+  - Do not add UTF-8, Unicode fonts, locale shaping, or multilingual display in v1.
   - Do not let GPIO numbers or I2C addresses leak into renderer, canvas, visual
     state, or DisplayController logic.
 Acceptance criteria:

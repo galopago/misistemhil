@@ -81,6 +81,8 @@ flowchart TD
   stack does not wait or poll for IP availability.
 - QR refresh is not special: payload or layout changes use the same display update
   path as any other content change.
+- On-screen strings for v1 are printable ASCII only; tildes, accented letters,
+  and non-English scripts are out of scope. Unsupported characters sanitize to `?`.
 
 ## Toolchain Environment
 
