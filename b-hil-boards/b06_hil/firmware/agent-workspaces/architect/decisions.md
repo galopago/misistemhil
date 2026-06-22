@@ -219,6 +219,33 @@ Open questions:
   - None.
 ```
 
+## 2026-06-20 — Read-Only Informational Display (No Menu v1)
+
+```text
+Date: 2026-06-20
+Decision: v1 OLED is one-way informational output only. No menus, navigation,
+  selection UI, cursors, or on-display data entry in the architecture.
+Context: User confirmed the screen shows status and information; it is not an input
+  surface for the user in this product phase.
+Implementation contract:
+  - docs/oled_text_display_interface.md section Display Interaction Model (v1 Product).
+  - DisplayController pushes informational layouts; no menu state or navigation model.
+Expected behavior:
+  - Multi-line layouts present readings, states, alerts, or setup QR when instructed.
+  - INVERTED emphasis may mark alerts; it does not imply menu selection.
+Non-goals:
+  - Menu screens, scrollable options, cursor, touch/button-driven UI on the OLED.
+Affected files:
+  - docs/oled_text_display_interface.md
+  - docs/architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - No acceptance criteria shall require menu or interactive display behavior in v1.
+Open questions:
+  - None.
+```
+
 ## 2026-06-20 — Root-Only HTTP URL and No HTTPS in QR v1
 
 ```text

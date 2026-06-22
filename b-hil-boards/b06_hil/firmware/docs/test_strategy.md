@@ -71,7 +71,8 @@ Host or component tests for the OLED implementation must cover:
   `?`.
 - Product strings for v1 should be ASCII-only at the source; if `café` is passed,
   rendered output is `caf?` (see Character Set Policy in the OLED contract).
-- Region-level and line-level `INVERTED` emphasis.
+- Region-level and line-level `INVERTED` emphasis (informational alerts, not menu
+  selection).
 - Separator rendering with separators enabled and disabled.
 - QR generation from short printable ASCII payloads using regular QR Code with
   `LOW` error correction.

@@ -85,6 +85,8 @@ flowchart TD
   and non-English scripts are out of scope. Unsupported characters sanitize to `?`.
 - Setup QR payloads are `http://IPv4` (implicit root `/` only). Path redirects
   and HTTPS are out of scope; another entity handles routing after scan.
+- v1 OLED is read-only informational output: no menus, navigation, or on-display
+  user input in the architecture.
 
 ## Toolchain Environment
 

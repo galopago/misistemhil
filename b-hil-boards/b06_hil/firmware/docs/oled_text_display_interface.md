@@ -52,6 +52,8 @@ Excluded:
 - Proprietary font details or graphics library details.
 - Icons, graphical indicators, gauges, cursors, arbitrary bitmaps, or
   interactive widgets.
+- Menus, navigation, selection UI, or any on-display user input for `b06_hil` v1
+  (see **Display Interaction Model (v1 Product)**).
 
 ## Normative Language
 
@@ -149,6 +151,27 @@ Examples:
 UTF-8, Unicode fonts, locale-aware shaping, and right-to-left text remain out of
 scope until a future architect handoff authorizes a new character-set profile.
 
+## Display Interaction Model (v1 Product)
+
+For `b06_hil` v1, the OLED is **read-only and informational**. It shows status,
+readings, alerts, and occasional setup QR content pushed by firmware logic. The
+user does **not** interact with the display to enter data or navigate options.
+
+Product rules:
+
+- **No menus** — no list screens, no highlighted selection, no cursor, no
+  scrollable options, and no on-screen navigation model in v1 architecture.
+- **One-way output** — application modules update what is shown; the display
+  stack does not accept button, touch, or encoder events for UI navigation.
+- **Informational layouts only** — multi-line templates (for example four lines of
+  status) are for presenting information, not for choosing items.
+- `INVERTED` emphasis MAY highlight alerts or warnings; it MUST NOT imply a
+  “selected menu line” in v1 because menus are out of scope.
+
+Menu, form, wizard, or data-entry UI patterns belong outside this product
+profile until a future architect handoff explicitly authorizes interactive
+display behavior.
+
 ## Expected Architecture
 
 The solution must be split into five conceptual layers:
@@ -186,8 +209,8 @@ flowchart TD
 
 - Is the single owner of display content decisions.
 - Receives or observes application data such as sensor readings, machine
-  states, menu state, and alerts.
-- Chooses what should be visible at any moment.
+  states, and alerts.
+- Chooses what informational content should be visible at any moment.
 - Builds the `DisplayLayout` and region content sent to the display task.
 - Applies priority rules outside the low-level display renderer.
 
@@ -334,8 +357,8 @@ Invalid numeric dimensions MUST be handled through best-effort clipping.
 - `INVERTED` emphasis must be supported at region level and line level.
 - Inverted text means the text band background is lit and the characters are
   drawn unlit.
-- Inverted emphasis is intended for alerts, warnings, selected menu lines, or
-  other high-priority states.
+- Inverted emphasis is intended for alerts, warnings, or other high-priority
+  informational states.
 - For text regions, `max_lines` defines how many text lines may be rendered
   inside the region.
 - For text regions, if fewer lines are provided, the remaining line slots are
@@ -673,7 +696,7 @@ Expected text content includes:
 
 - Sensor readings.
 - Machine or process states.
-- Text-only menu screens.
+- Short status or diagnostic messages.
 - Error or warning messages.
 
 Expected QR content includes:
@@ -1265,6 +1288,8 @@ Expected behavior:
 
 ## Implementation Constraints For `b06_hil`
 
+- v1 display is informational read-only output only. Do not design or implement
+  menus, navigation, selection UI, cursors, or on-display data entry.
 - On-screen copy for v1 is printable ASCII only. Do not use tildes, accented
   letters, or non-English scripts in product strings; unsupported input is
   sanitized to `?` per Character Set Policy (v1 Product).
