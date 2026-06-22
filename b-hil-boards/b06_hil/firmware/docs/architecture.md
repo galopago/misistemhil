@@ -24,7 +24,7 @@ Shared-document changes for display delivery are motivated by
 ```mermaid
 flowchart TD
     AppMain[main] --> AppCore[components/app_core]
-    Producer[producer module TBD] -->|"callback or esp_event"| AppCore
+    InstructionSource[instruction source TBD] -->|"callback"| AppCore
     AppCore --> Board[components/board]
     AppCore --> I2cBus[components/i2c_bus]
     AppCore --> I2cBroker[i2c_broker phase3]
@@ -55,9 +55,9 @@ flowchart TD
   transactions from multiple application tasks before they reach `i2c_bus`.
 - Display interface: conceptual visual stack for the 0.96 inch I2C OLED display.
   The visual contract is defined in `docs/oled_text_display_interface.md`.
-  QR matrix generation is defined in `docs/qr_encoder_interface.md`. Setup URLs
-  (`http://IPv4`) are produced outside the display controller and validated via
-  shared `setup_url` helpers.
+  QR matrix generation is defined in `docs/qr_encoder_interface.md`. QR payload
+  strings are opaque instruction content validated via shared `setup_url` helpers.
+  Delivery is defined in `docs/display_delivery_contract.md`.
   Implementation must keep display ownership in a controller/task boundary and
   must keep renderer/canvas logic independent from the physical I2C driver.
 - `tests/`: documentation and future host or hardware tests.
@@ -83,8 +83,8 @@ flowchart TD
   display states or layouts to the display task.
 - QR codes are sporadic content, not a permanently reserved screen region. The
   active layout may be text-only or include QR depending on application state.
-- QR appears only on explicit draw-QR instructions with a URL payload. The display
-  stack does not wait or poll for IP availability.
+- QR appears only when a display instruction includes a QR region and payload.
+  The display stack does not wait, poll, or depend on WiFi/network state.
 - QR refresh is not special: payload or layout changes use the same display update
   path as any other content change.
 - On-screen strings for v1 are printable ASCII only; tildes, accented letters,
@@ -98,27 +98,25 @@ flowchart TD
 
 ## Display Delivery (v1)
 
-All display and draw-QR instructions follow **`docs/display_delivery_contract.md`**.
+All display instructions (text or QR) follow **`docs/display_delivery_contract.md`**.
 
 Summary:
 
 ```text
-producer (TBD)  --notify-->  app_core  --display_controller_*-->  display stack
+instruction source (TBD)  --notify-->  app_core  --display_controller_*-->  display stack
 ```
 
 Rules:
 
-- **Only `app_core`** calls `display_controller_show_qr_setup`,
-  `display_controller_show_template`, or `display_controller_show_layout` in v1.
-- Producers notify `app_core` via **callback or `esp_event`**, not by calling display
-  APIs and not by polling.
-- **No application-level queue** between producers and `app_core`; the existing
-  `display_task` queue remains the internal display pipeline queue.
-- Producers supply validated intent (`http://IPv4` for QR); `app_core` invokes the
-  display API once per instruction.
+- **Only `app_core`** calls `display_controller_*` in v1.
+- Text and QR instructions use the **same** notify → direct API path.
+- Instruction sources call **`app_core` display entry points (callback)**; no
+  polling; no bypass of `app_core`. `esp_event` is not used for display in v1.
+- The display architecture MUST NOT reference or depend on WiFi, network stacks, or
+  connectivity state. Any such subsystem is fully decoupled.
 
-Rejected for v1: producer → `display_controller` direct calls, producer polling,
-multi-caller display access, ISR-to-display calls.
+Rejected for v1: direct producer → display calls, polling, multi-caller display
+access, separate QR delivery channel, display/network coupling.
 
 ## Toolchain Environment
 

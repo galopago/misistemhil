@@ -8,18 +8,17 @@ Source handoff: `agent-workspaces/architect/handoff.md`, `QR_ENCODER_INTERFACE`.
 
 ## Purpose
 
-Generate standards-compliant QR Code matrices for local setup screens. The base
-product payload is a fixed-format HTTP URL pointing at a local IPv4 address.
+Generate standards-compliant QR Code matrices when a **display instruction** includes
+a QR region. The v1 product payload shape is a fixed-format `http://IPv4` string.
 
-The display stack must not own network logic or URL construction. An external
-module supplies the payload string; shared validation lives in `setup_url`.
+The encoder and display stack MUST NOT depend on WiFi, network stacks, or any
+subsystem that may produce the payload string elsewhere in the firmware. The
+payload is opaque content supplied with the instruction; shared format validation
+lives in `setup_url`.
 
-Display text and QR payloads follow the printable ASCII v1 character policy in
-`docs/oled_text_display_interface.md` (unsupported characters become `?`).
-
-Draw-QR and other display instructions are delivered per
-`docs/display_delivery_contract.md`: producers notify `app_core`; only `app_core`
-calls `display_controller_*`.
+Display text and QR instructions use the **same delivery path** per
+`docs/display_delivery_contract.md`: instruction source → `app_core` →
+`display_controller_*`.
 
 ## Sporadic QR Usage and Dynamic Display
 
@@ -36,41 +35,34 @@ Rules:
 - Reference templates such as `QR_LEFT_TEXT_RIGHT` are **convenience examples** for
   one possible layout shape. They are not the default home screen and do not
   reserve pixels when another layout is active.
-- `DisplayController` chooses the active `DisplayLayout` per application state.
-  Showing a QR is an explicit layout decision for a specific moment (for example
-  setup/provisioning), not continuous background behavior.
-- When the controller switches from a QR layout to a text-only layout, the new
-  layout replaces the previous one atomically. No QR artifacts may remain from
-  the prior layout after render.
-- The external URL producer sends a payload only when a QR layout is requested.
-  The encoder runs only when the current layout contains a `QR` region.
-- `display_controller_show_qr_setup(...)` is a helper to build a QR layout for a
-  transient screen; callers may also supply a custom `DisplayLayout` with or
-  without QR regions.
+- `DisplayController` applies the active `DisplayLayout` when `app_core` calls the
+  display API. Showing a QR is one layout choice among others, not a special mode.
+- When the active layout switches away from QR, the new layout replaces the prior
+  one atomically. No QR artifacts may remain from the prior layout after render.
+- The encoder runs only when the active layout contains a `QR` region.
+- `display_controller_show_qr_setup(...)` builds a QR layout from instruction
+  payload; custom `DisplayLayout` values with QR regions are also valid.
 
 Implementers MUST NOT assume that setup demo screens, boot flows, or default
 templates keep QR visible at all times.
 
 ## Instruction-Driven QR Display
 
-QR appearance is **command-driven**, not network-state-driven.
+QR appearance follows the **same instruction model as text**. A QR is shown only
+when a display instruction (via `app_core`) requests a layout with a QR region
+and supplies the payload string.
 
 Rules:
 
-- The display stack MUST NOT poll, wait, or block for a valid IP address or URL.
-- If no module sends a draw-QR instruction, the display shows whatever text or
-  other layout the application has chosen. There is no implicit “waiting for IP”
-  screen in the display contract.
-- A QR screen appears only when an upstream module explicitly requests a layout
-  that includes a QR region and supplies the payload string (for example via
-  `display_controller_show_qr_setup(payload, ...)` or an equivalent layout update).
-- The external module decides **if and when** to issue that instruction. The
-  display does not infer readiness from network events.
+- The display stack MUST NOT poll, wait, or block for payload availability.
+- If no QR instruction arrives, the display shows whatever text or layout was last
+  instructed. There is no implicit waiting screen.
 - Absence of a QR instruction is normal operation, not an error state.
+- The display MUST NOT reference WiFi, network state, or connectivity when deciding
+  whether to draw QR.
 
-Implementers MUST NOT add display-side placeholders such as `WAITING` or similar
-states anticipating URL availability unless a future architect handoff explicitly
-authorizes them.
+Implementers MUST NOT add display-side placeholders such as `WAITING` unless a
+future architect handoff explicitly authorizes them.
 
 ## QR Refresh Policy
 
@@ -95,25 +87,26 @@ Rules:
 
 ```mermaid
 flowchart LR
-    ExternalModule[external module TBD] --> SetupUrl[setup_url]
-    SetupUrl --> AppCore[app_core orchestrator]
-    AppCore -->|"display_controller_* direct call"| DisplayController[DisplayController]
+    InstructionSource[instruction source TBD] --> AppCore[app_core]
+    AppCore --> SetupUrl[setup_url validate when QR]
+    AppCore --> DisplayController[DisplayController]
     DisplayController --> DisplayTask[display_task]
     DisplayTask --> QrEncoder[display_qr plus qrcodegen]
     QrEncoder --> Renderer[render_qr_region]
 ```
 
-External modules notify `app_core` (callback or `esp_event`); they MUST NOT call
-`display_controller_*` directly. See `docs/display_delivery_contract.md`.
+Instruction sources notify `app_core`; only `app_core` calls `display_controller_*`.
+See `docs/display_delivery_contract.md`. No layer in this diagram may depend on
+WiFi or network APIs.
 
 | Layer | Responsibility | Must not |
 | --- | --- | --- |
-| External module (TBD) | Obtain network context; validate URL; notify `app_core` | Draw pixels, encode QR, or call `display_controller_*` |
-| `setup_url` | Format and validate `http://IPv4` strings | Talk to display hardware |
-| `app_core` | Receive producer notifications; call `display_controller_*` | Encode QR matrices or touch I2C |
-| `DisplayController` | Build layout and optional companion text | Read network interfaces |
-| `display_qr` | Encode payload to module matrix via Nayuki | Parse IP addresses |
-| `ViewRenderer` | Scale, quiet zone, clip, draw modules | Choose QR library |
+| Instruction source (TBD) | Emit display instructions with payload when product logic requires | Draw pixels, encode QR, or call `display_controller_*` |
+| `setup_url` | Validate `http://IPv4` string shape | Talk to display hardware or network stacks |
+| `app_core` | Accept instructions; call `display_controller_*` | Encode QR matrices; touch I2C; call WiFi/network APIs for display |
+| `DisplayController` | Build layout from instruction payload | Infer payload origin |
+| `display_qr` | Encode payload to module matrix via Nayuki | Choose QR library |
+| `ViewRenderer` | Scale, quiet zone, clip, draw modules | Encode QR matrices |
 
 ## Product Payload Profile (v1)
 
@@ -135,10 +128,9 @@ Rules:
 
 - The firmware display and encoder stack MUST NOT encode paths such as `/setup`
   or `/config` in the QR payload for v1.
-- If the user must end up at `/something` after scan, **another entity** (for
-  example an HTTP server, captive portal, or reverse proxy on the network side)
-  performs that redirect or routing. That behavior is outside `b06_hil` display
-  and QR encoder scope.
+- If scanning must reach a subpath after the root URL, **another entity outside the
+  display and encoder stack** handles that behavior. The display contract does not
+  name or depend on that entity.
 - The draw-QR instruction supplies only the root URL form; redirect policy is not
   a display concern.
 
@@ -284,8 +276,10 @@ void display_qr_release(display_qr_matrix_t *matrix);
 
 ## Shared `setup_url` Utility
 
-Validation and formatting MUST be shared between the future network module and
-the display path.
+Validation and formatting for the v1 QR payload shape. Any code path that builds or
+accepts QR instruction payloads MAY use these helpers, including `app_core` and
+instruction sources. This utility MUST NOT create a dependency between the display
+stack and WiFi or network components.
 
 Recommended component: `components/setup_url/`.
 
@@ -300,10 +294,11 @@ Rules:
 - `setup_url_format_ipv4` writes `http://a.b.c.d` when all octets are `0..255`
   and `out_len` is sufficient (minimum 15 bytes for `http://0.0.0.0` plus NUL).
 - `setup_url_validate` accepts only the v1 product profile (`http://IPv4`).
-- An external module notifies `app_core` when a QR screen is needed and supplies
-  a finished URL string validated with `setup_url`.
-- `app_core` calls `display_controller_show_qr_setup` or equivalent layout API.
-- `DisplayController` MUST NOT read network interfaces or accept direct producer calls.
+- An instruction source includes the finished URL string in a QR display instruction.
+- `app_core` validates with `setup_url` and calls `display_controller_show_qr_setup`
+  or equivalent layout API.
+- `DisplayController` MUST NOT discover or construct payload strings from outside
+  the instruction it receives via `app_core`.
 
 ## Invalid Input and Fallback Behavior
 
@@ -363,22 +358,20 @@ Tester:
 
 ## Open Questions
 
-These items do not block encoder or delivery-contract implementation but MUST
-remain explicit until closed:
+These items do not block encoder or delivery-contract implementation:
 
-1. **External URL producer module** — component name, location, and the product
-   event that triggers `SHOW_QR_SETUP` notification to `app_core`.
-2. **Notification transport pin** — confirm callback vs `esp_event` when the
-   producer module is implemented (either is valid; see
-   `docs/display_delivery_contract.md`).
-3. **`setup_url` component path** — confirm `components/setup_url/` at implementation.
-4. **Nayuki vendor path** — confirm `components/qr_encoder/vendor/` layout at implementation.
-5. **Measured flash/RAM budget** — record after first integration build.
-6. **Future URL extensions** — `https://`, port, path in QR payload, IPv6 remain
+1. **Instruction source identity** — component or role that emits display
+   instructions (may live entirely inside `app_core` if centralized).
+2. **`setup_url` component path** — confirm `components/setup_url/` at implementation.
+3. **Nayuki vendor path** — confirm `components/qr_encoder/vendor/` layout at implementation.
+4. **Measured flash/RAM budget** — record after first integration build.
+5. **Future URL extensions** — `https://`, port, path in QR payload, IPv6 remain
    out of scope until a new product profile is authorized.
 
 Closed in v1 architecture:
 
-- **Delivery contract to display** — centralized `app_core` orchestration with
-  direct `display_controller_*` calls after producer callback or `esp_event`
-  (`docs/display_delivery_contract.md`).
+- **Delivery contract** — text and QR instructions share callback → `app_core` →
+  direct `display_controller_*` (`docs/display_delivery_contract.md`).
+- **WiFi/network decoupling** — display architecture MUST NOT reference or depend
+  on connectivity subsystems.
+- **Notification transport** — callback / direct `app_core` APIs (not `esp_event`).

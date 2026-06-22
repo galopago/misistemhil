@@ -145,7 +145,7 @@ Context: Setup screens need scannable local URLs without coupling display to
   network stack or restrictive encoder licenses.
 Alternatives considered:
   - libqrencode (LGPL) — rejected for license restrictiveness.
-  - Display-owned URL formatting from netif — rejected; payload comes from outside.
+  - Display-owned URL formatting from netif — rejected; payload arrives with instruction.
   - Validation only in external module — rejected; user chose shared setup_url.
 Implementation contract:
   - docs/qr_encoder_interface.md is normative for encoder behavior.
@@ -170,30 +170,27 @@ Affected files:
 Validation expectations:
   - Tests in docs/test_strategy.md QR Encoder Criteria section.
 Open questions:
-  - External URL producer module and SHOW_QR_SETUP trigger event.
-  - Callback vs esp_event pin when producer is implemented.
+  - Instruction source identity for display instructions.
 ```
 
 ## 2026-06-20 — Display Delivery via app_core Orchestration
 
 ```text
 Date: 2026-06-20
-Decision: v1 display instructions use centralized app_core orchestration. Producers
-  notify app_core (callback or esp_event); only app_core calls display_controller_*
-  directly. No application queue; no polling; no multi-caller display access.
-Context: User selected the pragmatic pattern over queue, polling, or producer-direct
-  display calls after architectural options review.
+Decision: v1 display instructions use centralized app_core orchestration. Instruction
+  sources call app_core via callback; only app_core calls display_controller_*
+  directly. Text and QR share the same path. No display/network coupling.
+Context: User selected centralized orchestration with callback transport (not esp_event).
 Implementation contract:
   - docs/display_delivery_contract.md is normative.
-  - docs/architecture.md Display Delivery section summarizes the path.
-  - Handoff DISPLAY_DELIVERY_CONTRACT authorizes app_core integration work.
 Expected behavior:
-  - producer --notify--> app_core --display_controller_*--> display_task --> OLED
-  - setup_url validation before display call for QR notifications.
+  - instruction source --callback--> app_core --display_controller_*--> display_task --> OLED
 Non-goals:
-  - Producer calls display_controller_* or display_set_*.
+  - esp_event display transport in v1.
+  - Instruction source calls display_controller_* or display_set_*.
   - Application-level display command queue.
-  - Polling for QR/URL readiness.
+  - Polling for pending instructions.
+  - Display architecture references to WiFi/network.
 Affected files:
   - docs/display_delivery_contract.md
   - docs/architecture.md
@@ -204,7 +201,61 @@ Affected files:
 Validation expectations:
   - docs/test_strategy.md Display Delivery Criteria section.
 Open questions:
-  - Producer module identity and primary notification transport pin at implementation.
+  - Instruction source identity for display instructions.
+```
+
+## 2026-06-20 — Callback Transport for Display Instructions (v1)
+
+```text
+Date: 2026-06-20
+Decision: v1 display instructions use callback (or internal app_core function calls)
+  into app_core. esp_event is not the v1 transport.
+Context: User expects centralized orchestration in app_core; callback keeps the
+  path simple and debuggable.
+Implementation contract:
+  - docs/display_delivery_contract.md section Selected transport (v1): callback.
+  - app_core exposes app_core_display_show_template and app_core_display_show_qr_setup
+    (names illustrative) and calls display_controller_* internally.
+Non-goals:
+  - esp_event posting for display instructions in v1 without a new handoff.
+Affected files:
+  - docs/display_delivery_contract.md
+  - docs/architecture.md
+  - docs/qr_encoder_interface.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - Tests call app_core callbacks; grep shows no esp_event display handlers in v1.
+Open questions:
+  - None.
+```
+
+## 2026-06-20 — Display Decoupled from WiFi/Network
+
+```text
+Date: 2026-06-20
+Decision: Display architecture MUST NOT reference, assume, or depend on WiFi or
+  network subsystems. QR instructions use the same delivery path as text instructions.
+Context: User clarified that whatever draws QR is the same as what draws text; any
+  connectivity stack must remain fully decoupled from display docs and code.
+Implementation contract:
+  - docs/display_delivery_contract.md Core Rule: QR Equals Text (Delivery).
+  - docs/qr_encoder_interface.md and docs/architecture.md remove network coupling.
+  - setup_url validates payload shape only; it does not link display to network.
+Non-goals:
+  - URL producer, network module, or WiFi-triggered display paths in architecture.
+  - Separate QR delivery channel.
+Affected files:
+  - docs/display_delivery_contract.md
+  - docs/qr_encoder_interface.md
+  - docs/oled_text_display_interface.md
+  - docs/architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - Grep: no WiFi/network headers in display component; display docs omit network coupling.
+Open questions:
+  - None.
 ```
 
 ## 2026-06-20 — Unified QR Refresh Policy
@@ -241,9 +292,10 @@ Context: User clarified that absence of a QR instruction is normal; there is no
   need to anticipate "waiting for valid IP" UX in the display contract.
 Implementation contract:
   - docs/qr_encoder_interface.md section Instruction-Driven QR Display.
-  - DisplayController applies instructions; it does not observe network readiness.
+  - DisplayController applies instructions; it does not observe connectivity state.
 Non-goals:
-  - WAITING screens, IP polling, or implicit setup states in the display stack.
+  - WAITING screens, polling, or implicit setup states in the display stack.
+  - References to WiFi/network in display architecture.
 Affected files:
   - docs/qr_encoder_interface.md
   - agent-workspaces/architect/handoff.md

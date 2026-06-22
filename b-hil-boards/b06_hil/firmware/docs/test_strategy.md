@@ -126,8 +126,8 @@ tests remain under OLED Display Criteria above.
   valid default states with no QR region.
 - QR layouts are occasional and instruction-driven; tests must include at least
   one layout transition away from QR to text-only.
-- Absence of any draw-QR instruction is valid; no test shall require a waiting
-  or placeholder screen for URL availability.
+- Absence of any display instruction is valid; no test shall require a waiting
+  or placeholder screen.
 
 ### QR test record additions
 
@@ -145,21 +145,21 @@ Validation follows `docs/display_delivery_contract.md`.
 
 - Only `components/app_core/` includes `display_controller.h` in v1 firmware
   (display component internals excluded from this grep rule).
-- No producer component includes `display_controller.h` or `display.h`.
+- No instruction-source component includes `display_controller.h` or `display.h`.
+- Display component tree MUST NOT include WiFi/network headers.
 
 ### Notification path
 
-- A test hook or mock producer can notify `app_core` (event or callback) with a
-  valid `http://IPv4` URL.
-- `app_core` invokes `display_controller_show_qr_setup` (direct call) after
-  `setup_url_validate` succeeds.
-- Invalid URL notification does not call display APIs.
-- Second notification with a different valid URL updates the screen via the same path.
+- Text and QR instructions use the same **callback → `app_core` → direct API** path.
+- Tests invoke `app_core` display entry points; no `esp_event` display transport in v1.
+- QR: `app_core` calls `display_controller_show_qr_setup` after `setup_url_validate`.
+- Invalid QR payload does not call display APIs.
 
 ### Non-requirements
 
-- No test shall require an application-level queue between producer and `app_core`.
-- No test shall poll for pending QR state in firmware loops.
+- No test shall require an application-level queue between instruction source and `app_core`.
+- No test shall poll for pending instructions.
+- No test shall couple display behavior to WiFi/network state.
 
 ## I2C Bus Criteria
 

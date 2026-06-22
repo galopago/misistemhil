@@ -46,7 +46,8 @@ Excluded:
 
 - A concrete I2C driver.
 - QR matrix encoding implementation details (see `docs/qr_encoder_interface.md`).
-- Network URL construction or IP discovery.
+- Payload origin or discovery outside the display instruction (display receives
+  only the string supplied with the instruction).
 - Dependencies on a concrete operating system, RTOS, SDK, or framework.
 - Electrical bus configuration.
 - Proprietary font details or graphics library details.
@@ -724,10 +725,9 @@ Expected text content includes:
 
 Expected QR content includes:
 
-- `http://aaa.bbb.ccc.ddd` local IPv4 setup URLs supplied with an explicit
-  draw-QR instruction from outside the display stack. If no such instruction
-  arrives, the display shows text or other layouts only; it does not wait for IP
-  or URL availability.
+- `http://aaa.bbb.ccc.ddd` strings supplied as payload in a QR display instruction
+  (same delivery path as text). If no QR instruction arrives, text or other layouts
+  remain shown.
 
 Reference templates are convenience examples for common arrangements. They are not
 mandatory default screens and do not reserve screen area when another layout is
@@ -1323,11 +1323,10 @@ Expected behavior:
 - On-screen copy for v1 is printable ASCII only. Do not use tildes, accented
   letters, or non-English scripts in product strings; unsupported input is
   sanitized to `?` per Character Set Policy (v1 Product).
-- QR encoding must follow `docs/qr_encoder_interface.md`. The display controller
-  must not construct setup URLs from network state.
-- Display instructions from application logic MUST follow
-  `docs/display_delivery_contract.md` (`app_core` only caller of
-  `display_controller_*`).
+- QR encoding must follow `docs/qr_encoder_interface.md`. Payload strings arrive
+  only through display instructions handled by `app_core`.
+- Display instructions MUST follow `docs/display_delivery_contract.md` (`app_core`
+  sole caller; text and QR share the same path; no WiFi/network coupling).
 - The initial implementation must not enable the I2C peripheral until the
   ESP32-C3 SuperMini pin map is confirmed against the schematic.
 - Hardware address, I2C bus, contrast, and orientation belong to driver or

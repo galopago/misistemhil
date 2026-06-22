@@ -286,7 +286,7 @@ Objective:
   http://IPv4 product payload profile and a permissive MIT-licensed encoder.
 Reason:
   The display renderer already draws QR regions but the encoder is a stub.
-  Setup URLs must come from outside the display stack with shared validation.
+  QR payload strings arrive via display instructions; setup_url validates shape only.
 Authorized files:
   - docs/qr_encoder_interface.md
   - docs/oled_text_display_interface.md cross-references only
@@ -301,12 +301,11 @@ Expected changes:
   - Implement display_qr_generate using byte mode and LOW error correction.
   - Add setup_url_format_ipv4 and setup_url_validate for http://IPv4 only.
   - Keep DisplayController payload input via display_controller_show_qr_setup.
-  - Do not move network IP discovery into display code.
+  - Do not couple display or encoder code to WiFi/network APIs.
 Module boundaries and contracts:
   - Follow docs/qr_encoder_interface.md as normative source.
-  - External module (TBD) produces URL strings; setup_url validates/formats.
+  - Instruction sources supply QR payload in display instructions; setup_url validates.
   - display_qr owns matrix encoding only; renderer owns drawing.
-  - DisplayController owns fallback text when encode fails.
 Detailed behavior:
   - Product payloads: http:// plus IPv4 only, implicit root /, length 14 to 22 chars,
     QR version 1 or 2.
@@ -318,15 +317,16 @@ Detailed behavior:
   - QR is sporadic: shown only when the active DisplayLayout includes a QR region.
   - The screen is dynamic (text-only layouts are normal; QR layouts are occasional).
   - No permanently reserved QR screen area; layout switches replace the full view.
-  - QR is instruction-driven: no display-side wait or poll for IP/URL availability.
+  - QR is instruction-driven: same delivery path as text; no display-side wait or poll.
   - QR refresh uses the same display update path as any other layout or content change.
 Non-goals:
   - https, hostname, port, path in QR payload, IPv6 in v1.
   - Firmware-owned HTTP redirects or subpath routing after QR scan.
   - Hand-rolled QR encoding.
-  - Display-owned URL construction from network APIs.
+  - Display-owned payload construction from WiFi/network APIs.
+  - Architectural coupling between display and connectivity subsystems.
   - A fixed always-on QR panel or split-screen reserved for QR.
-  - Display-side waiting screens or polling for valid IP before showing QR.
+  - Display-side waiting screens or polling for pending instructions.
   - QR-specific refresh, debounce, or partial-update policies separate from the
     general display refresh contract.
 Acceptance criteria:
@@ -343,9 +343,8 @@ Validation plan:
   - Hardware scan test of QR_LEFT_TEXT_RIGHT when OLED driver is active.
   - Record measured flash/RAM after first integration.
 Open questions:
-  - External URL producer module name, location, and SHOW_QR_SETUP trigger event.
+  - Instruction source identity (may be internal to app_core if centralized).
   - Confirm components/setup_url/ and vendor path at implementation time.
-  - Confirm callback vs esp_event when producer is implemented.
 ```
 
 ## DISPLAY_DELIVERY_CONTRACT
@@ -353,55 +352,56 @@ Open questions:
 ```text
 ID: DISPLAY_DELIVERY_CONTRACT
 Objective:
-  Implement and enforce the v1 path from application producers to the OLED stack:
-  producer notifies app_core; only app_core calls display_controller_* directly.
+  Implement and enforce the v1 path for all display instructions (text and QR):
+  instruction source calls app_core callbacks; only app_core calls display_controller_* directly.
 Reason:
-  The delivery mechanism was an open architectural question. A single orchestrator
-  avoids polling, multi-caller races, and coupling network code to display APIs.
+  One orchestration path avoids polling, multi-caller races, special QR channels,
+  and any coupling between display and WiFi/network subsystems.
 Authorized files:
   - docs/display_delivery_contract.md
   - docs/architecture.md cross-references
   - docs/oled_text_display_interface.md cross-references only
   - docs/qr_encoder_interface.md cross-references only
   - docs/test_strategy.md
-  - components/app_core/ for notification handlers and sole display_controller calls
-  - future producer components for notify-only integration (no display includes)
+  - components/app_core/ for callback entry points and sole display_controller calls
   - agent-workspaces/implementer/ for implementation notes
 Expected changes:
-  - Add app_core notification surface (esp_event and/or register hooks).
-  - Route SHOW_QR_SETUP to display_controller_show_qr_setup after setup_url_validate.
+  - Add app_core_display_show_template and app_core_display_show_qr_setup callbacks.
+  - Route text and QR instructions to matching display_controller_* APIs inside app_core.
+  - Validate QR payload shape with setup_url at app_core before display call.
   - Ensure no module other than app_core includes display_controller.h in v1.
-  - Document chosen notification transport in implementer handoff when producer exists.
+  - Ensure display tree excludes WiFi/network headers.
 Module boundaries and contracts:
   - Follow docs/display_delivery_contract.md as normative source.
-  - Producer: notify app_core only; validate URL with setup_url before notify.
+  - v1 transport: callback or internal app_core function call only (not esp_event).
+  - Instruction source: call app_core entry points; no display API calls.
   - app_core: sole display_controller_* caller; task context only; no polling.
-  - Display stack unchanged below DisplayController.
+  - Text and QR instructions MUST use identical delivery semantics.
+  - WiFi/network stacks MUST remain decoupled from display architecture.
 Detailed behavior:
-  - Transport: callback into app_core OR esp_event post handled by app_core.
-  - No application queue between producer and app_core in v1.
+  - Centralized orchestration expected in app_core for v1.
+  - No application queue between instruction source and app_core.
   - display_task internal queue remains the only display pipeline queue.
-  - Invalid URL notifications rejected at app_core without display calls.
-  - URL replacement via second notification uses same direct call path.
+  - Invalid QR payload rejected at app_core without display calls.
 Non-goals:
-  - Producer direct calls to display_controller_* or display_set_*.
-  - Polling for pending QR or URL state.
-  - Application-level display command queue separate from display_task.
+  - esp_event transport for display instructions in v1.
+  - Instruction source direct calls to display_controller_* or display_set_*.
+  - Polling for pending instructions.
+  - Separate QR delivery channel or display/network coupling.
   - ISR-to-display calls.
 Acceptance criteria:
   - Grep audit: only app_core includes display_controller.h in v1 firmware.
-  - Valid SHOW_QR_SETUP notification results in QR layout on device.
-  - Invalid URL does not invoke display APIs.
+  - Text and QR instructions both flow callback → app_core → direct API.
+  - No display/app_core references to WiFi/network for screen selection.
   - docs/display_delivery_contract.md acceptance criteria satisfied.
 Constraints:
   - Do not widen display_controller callers without new architect handoff.
-  - Producer module identity may remain TBD; contract must work with test hook.
+  - Do not add esp_event display path without new architect handoff.
 Validation plan:
-  - Implementer documents grep result and notification transport choice.
-  - Tester verifies QR via app_core test event/hook without producer bypass.
+  - Implementer documents grep results and app_core callback API names.
+  - Tester verifies text and QR via app_core callbacks without display bypass.
 Open questions:
-  - Producer module name, location, and product trigger for SHOW_QR_SETUP.
-  - Pin callback vs esp_event when producer is implemented.
+  - Instruction source identity if not fully internal to app_core.
 ```
 
 ## Template
