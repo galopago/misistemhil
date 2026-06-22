@@ -87,6 +87,8 @@ flowchart TD
   and HTTPS are out of scope; another entity handles routing after scan.
 - v1 OLED is read-only informational output: no menus, navigation, or on-display
   user input in the architecture.
+- Display power saving (sleep, dim, panel off) is out of scope for v1; the product
+  is occasional-use, not continuous 24/7 operation.
 
 ## Toolchain Environment
 

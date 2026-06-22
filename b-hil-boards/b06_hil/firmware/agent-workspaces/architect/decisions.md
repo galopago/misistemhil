@@ -219,6 +219,31 @@ Open questions:
   - None.
 ```
 
+## 2026-06-20 — No Display Power Management in v1
+
+```text
+Date: 2026-06-20
+Decision: OLED sleep, dimming, and display power-saving policies are out of scope
+  for v1. The product is occasional-use, not 24/7 continuous operation.
+Context: User confirmed energy saving for the display is not needed at this stage.
+Implementation contract:
+  - docs/oled_text_display_interface.md section Display Power Policy (v1 Product).
+  - Refresh rate limiting remains a performance rule, not power management.
+Expected behavior:
+  - Panel may stay on with last content for a power-on session; no sleep/wake UI.
+Non-goals:
+  - OLED sleep, dim, panel off, wake-on-event display policies in v1 architecture.
+Affected files:
+  - docs/oled_text_display_interface.md
+  - docs/architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - No tests shall require display power-management behavior in v1.
+Open questions:
+  - None.
+```
+
 ## 2026-06-20 — Read-Only Informational Display (No Menu v1)
 
 ```text

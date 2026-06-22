@@ -83,6 +83,7 @@ Detailed behavior:
     the active layout includes a QR region (no permanently reserved QR area).
   - v1 display is read-only informational: push status/readings/alerts to screen;
     no menus, navigation, selection UI, or on-display data entry.
+  - Occasional-use product: no OLED sleep, dimming, or display power management in v1.
   - Text supports printable ASCII only, controlled truncation without ellipsis,
     LEFT/CENTER/RIGHT horizontal alignment, TOP/CENTER/BOTTOM vertical group
     alignment, and NORMAL/INVERTED emphasis.
@@ -98,6 +99,8 @@ Non-goals:
     platform-specific public visual contract.
   - Do not implement menus, navigation, highlighted selection, or any interactive
     on-display UI for v1; the OLED is informational output only.
+  - Do not implement display power saving (sleep, dim, panel off) for v1; occasional
+    use does not require 24/7 OLED power policies.
   - Do not treat QR_LEFT_TEXT_RIGHT as a fixed split-screen with permanent QR slot.
   - Do not add UTF-8, Unicode fonts, locale shaping, or multilingual display in v1.
   - Do not let GPIO numbers or I2C addresses leak into renderer, canvas, visual

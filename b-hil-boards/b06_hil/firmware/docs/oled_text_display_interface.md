@@ -54,6 +54,8 @@ Excluded:
   interactive widgets.
 - Menus, navigation, selection UI, or any on-display user input for `b06_hil` v1
   (see **Display Interaction Model (v1 Product)**).
+- OLED sleep, dimming, or display power-management policies for v1 (see **Display
+  Power Policy (v1 Product)**).
 
 ## Normative Language
 
@@ -171,6 +173,26 @@ Product rules:
 Menu, form, wizard, or data-entry UI patterns belong outside this product
 profile until a future architect handoff explicitly authorizes interactive
 display behavior.
+
+## Display Power Policy (v1 Product)
+
+For `b06_hil` v1, **display power saving is out of scope**. The product is expected
+to operate **occasionally**, not as a 24/7 always-on display appliance.
+
+Product rules:
+
+- No OLED sleep, dimming, panel power-off, or wake-on-event policy in v1
+  architecture.
+- The display stack MAY leave the panel initialized and showing the last rendered
+  content for the duration of a power-on session; that is acceptable for v1.
+- Software SHOULD still avoid unnecessary refreshes when content is static (see
+  Refresh Policy), but that is a performance concern, not a power-management feature.
+- Board-level or system-level sleep of the MCU remains outside this display
+  contract unless a future handoff defines how display state behaves across wake.
+
+Display power management belongs outside this product profile until a future
+architect handoff authorizes it (for example if the device moves to continuous
+operation).
 
 ## Expected Architecture
 
@@ -955,7 +977,10 @@ QR updates are not a special case. A new URL in a draw-QR instruction follows th
 same coalescing, rate limiting, full redraw, and message rules as text or layout
 updates.
 
-The base version does not require animations or display power management.
+The base version does not require animations or display power management. For
+`b06_hil` v1, power saving of the OLED is explicitly out of scope because the
+device is occasional-use, not 24/7 operation (see **Display Power Policy (v1
+Product)**).
 
 Recommendations:
 
@@ -1290,6 +1315,8 @@ Expected behavior:
 
 - v1 display is informational read-only output only. Do not design or implement
   menus, navigation, selection UI, cursors, or on-display data entry.
+- Do not implement OLED sleep, dimming, or display power-management for v1;
+  occasional use does not require 24/7 power-saving behavior.
 - On-screen copy for v1 is printable ASCII only. Do not use tildes, accented
   letters, or non-English scripts in product strings; unsupported input is
   sanitized to `?` per Character Set Policy (v1 Product).

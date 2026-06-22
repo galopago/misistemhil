@@ -74,6 +74,7 @@ Host or component tests for the OLED implementation must cover:
 - Region-level and line-level `INVERTED` emphasis (informational alerts, not menu
   selection).
 - Separator rendering with separators enabled and disabled.
+- No v1 acceptance criteria for OLED sleep, dimming, or display power-off behavior.
 - QR generation from short printable ASCII payloads using regular QR Code with
   `LOW` error correction.
 - Graceful blank rendering when a QR payload cannot fit at scale `2` or fallback
