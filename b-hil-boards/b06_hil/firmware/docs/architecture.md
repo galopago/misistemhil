@@ -77,6 +77,10 @@ flowchart TD
   display states or layouts to the display task.
 - QR codes are sporadic content, not a permanently reserved screen region. The
   active layout may be text-only or include QR depending on application state.
+- QR appears only on explicit draw-QR instructions with a URL payload. The display
+  stack does not wait or poll for IP availability.
+- QR refresh is not special: payload or layout changes use the same display update
+  path as any other content change.
 
 ## Toolchain Environment
 

@@ -640,7 +640,10 @@ Expected text content includes:
 
 Expected QR content includes:
 
-- `http://aaa.bbb.ccc.ddd` local IPv4 setup URLs supplied by an external module.
+- `http://aaa.bbb.ccc.ddd` local IPv4 setup URLs supplied with an explicit
+  draw-QR instruction from outside the display stack. If no such instruction
+  arrives, the display shows text or other layouts only; it does not wait for IP
+  or URL availability.
 
 Reference templates are convenience examples for common arrangements. They are not
 mandatory default screens and do not reserve screen area when another layout is
@@ -884,7 +887,12 @@ The display must be updated when:
 
 - The visual state changes.
 - The layout changes.
+- Region content changes, including QR payload changes in a QR region.
 - `force_refresh` is requested.
+
+QR updates are not a special case. A new URL in a draw-QR instruction follows the
+same coalescing, rate limiting, full redraw, and message rules as text or layout
+updates.
 
 The base version does not require animations or display power management.
 

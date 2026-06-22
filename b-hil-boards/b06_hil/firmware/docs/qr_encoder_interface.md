@@ -44,6 +44,46 @@ Rules:
 Implementers MUST NOT assume that setup demo screens, boot flows, or default
 templates keep QR visible at all times.
 
+## Instruction-Driven QR Display
+
+QR appearance is **command-driven**, not network-state-driven.
+
+Rules:
+
+- The display stack MUST NOT poll, wait, or block for a valid IP address or URL.
+- If no module sends a draw-QR instruction, the display shows whatever text or
+  other layout the application has chosen. There is no implicit “waiting for IP”
+  screen in the display contract.
+- A QR screen appears only when an upstream module explicitly requests a layout
+  that includes a QR region and supplies the payload string (for example via
+  `display_controller_show_qr_setup(payload, ...)` or an equivalent layout update).
+- The external module decides **if and when** to issue that instruction. The
+  display does not infer readiness from network events.
+- Absence of a QR instruction is normal operation, not an error state.
+
+Implementers MUST NOT add display-side placeholders such as `WAITING` or similar
+states anticipating URL availability unless a future architect handoff explicitly
+authorizes them.
+
+## QR Refresh Policy
+
+Updating a QR payload or redrawing a QR region uses the **same refresh path** as
+any other display update. There is no separate QR debounce, partial-QR update mode,
+or QR-specific refresh policy.
+
+Rules:
+
+- A new draw-QR instruction with a different URL is a normal layout or content
+  update (for example `SET_CONTENT` / `display_set_content`).
+- The display task applies the same rules as in
+  `docs/oled_text_display_interface.md` Refresh Policy: latest state wins,
+  coalesced updates, optional `10 Hz` rate limit, full canvas clear and redraw.
+- QR re-encoding happens during render when the active layout includes a QR region
+  whose payload changed or when a forced refresh requires it.
+- Implementers MUST NOT add QR-only incremental framebuffer updates unless a
+  future architect handoff authorizes a general partial-update feature for all
+  region types.
+
 ## Layer Model
 
 ```mermaid
@@ -222,11 +262,10 @@ Rules:
 - `setup_url_format_ipv4` writes `http://a.b.c.d` when all octets are `0..255`
   and `out_len` is sufficient (minimum 15 bytes for `http://0.0.0.0` plus NUL).
 - `setup_url_validate` accepts only the v1 product profile (`http://IPv4`).
-- The external network module is responsible for deciding **when** to produce a
-  URL and **which IP** to expose.
-- `DisplayController` receives the finished string through APIs such as
-  `display_controller_show_qr_setup(const char *payload, ...)` and MUST NOT read
-  network interfaces directly.
+- An external module issues a draw-QR instruction when the product needs a QR
+  screen and supplies the finished URL string at that moment.
+- `DisplayController` applies the instruction by building or accepting a layout
+  with a QR region. It MUST NOT read network interfaces or wait for IP validity.
 
 ## Invalid Input and Fallback Behavior
 
@@ -237,9 +276,10 @@ Rules:
 | Too long for version 2 | returns false | QR region blank |
 | Encoder internal error | returns false | QR region blank |
 
-Fallback explanatory text (for example `SETUP`, `WAITING`) MUST be chosen by
-`DisplayController` before rendering. The renderer MUST NOT invent fallback
-copy when QR encoding fails.
+When a draw-QR instruction was issued but encoding fails, optional companion text
+in the same layout MAY be supplied by whoever issued the instruction. The
+renderer MUST NOT invent fallback copy. The display MUST NOT enter a generic
+“waiting for URL” mode on its own.
 
 ## Relationship to QR Rendering
 
@@ -264,6 +304,10 @@ An implementation satisfies this document if:
 - Switching from a QR layout to a text-only layout removes QR from the screen with
   no residual modules after render.
 - Encoder is invoked only when the active layout includes a QR region.
+- No draw-QR instruction means no QR region and no wait/poll behavior in the
+  display stack.
+- QR payload or layout updates use the same refresh policy as any other display
+  content change.
 
 ## Suggested Validation
 
@@ -284,14 +328,12 @@ Tester:
 These items do not block encoder implementation but MUST remain explicit until a
 future architect handoff closes them:
 
-1. **External URL producer module** — component name, location, and event that
-   triggers URL creation.
-2. **Delivery contract to display** — callback, queue, polling, or direct
-   `app_core` call to `display_controller_show_qr_setup`.
-3. **UX without valid IP** — exact template and text while URL is unavailable.
-4. **Refresh on IP change** — update QR region only vs full layout; debounce policy.
-5. **`setup_url` component path** — confirm `components/setup_url/` at implementation.
-6. **Nayuki vendor path** — confirm `components/qr_encoder/vendor/` layout at implementation.
-7. **Measured flash/RAM budget** — record after first integration build.
-8. **Future URL extensions** — `https://`, port, path, IPv6 remain out of scope
+1. **External URL producer module** — component name, location, and the event or
+   condition that triggers a draw-QR instruction.
+2. **Delivery contract to display** — callback, queue, polling, or direct call to
+   `display_controller_show_qr_setup` when an instruction is issued.
+3. **`setup_url` component path** — confirm `components/setup_url/` at implementation.
+4. **Nayuki vendor path** — confirm `components/qr_encoder/vendor/` layout at implementation.
+5. **Measured flash/RAM budget** — record after first integration build.
+6. **Future URL extensions** — `https://`, port, path, IPv6 remain out of scope
    until a new product profile is authorized.

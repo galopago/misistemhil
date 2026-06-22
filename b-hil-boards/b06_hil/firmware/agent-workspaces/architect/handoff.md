@@ -302,11 +302,16 @@ Detailed behavior:
   - QR is sporadic: shown only when the active DisplayLayout includes a QR region.
   - The screen is dynamic (text-only layouts are normal; QR layouts are occasional).
   - No permanently reserved QR screen area; layout switches replace the full view.
+  - QR is instruction-driven: no display-side wait or poll for IP/URL availability.
+  - QR refresh uses the same display update path as any other layout or content change.
 Non-goals:
   - https, hostname, port, path, IPv6 payloads in v1.
   - Hand-rolled QR encoding.
   - Display-owned URL construction from network APIs.
   - A fixed always-on QR panel or split-screen reserved for QR.
+  - Display-side waiting screens or polling for valid IP before showing QR.
+  - QR-specific refresh, debounce, or partial-update policies separate from the
+    general display refresh contract.
 Acceptance criteria:
   - MIT LICENSE recorded in vendor tree.
   - Canonical payloads encode to width 21 or 25 as documented.
@@ -321,10 +326,8 @@ Validation plan:
   - Hardware scan test of QR_LEFT_TEXT_RIGHT when OLED driver is active.
   - Record measured flash/RAM after first integration.
 Open questions:
-  - External URL producer module name, location, and update event.
+  - External URL producer module name, location, and draw-QR trigger.
   - Delivery contract from producer to display_controller_show_qr_setup.
-  - UX template when no valid IP is available.
-  - Refresh policy when IP changes (debounce, partial layout update).
   - Confirm components/setup_url/ and vendor path at implementation time.
 ```
 

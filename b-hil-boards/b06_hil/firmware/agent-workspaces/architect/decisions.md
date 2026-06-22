@@ -170,8 +170,53 @@ Affected files:
 Validation expectations:
   - Tests in docs/test_strategy.md QR Encoder Criteria section.
 Open questions:
-  - External URL producer module and delivery contract to display.
-  - UX without valid IP and refresh-on-change policy.
+  - External URL producer module and delivery contract for draw-QR instructions.
+```
+
+## 2026-06-20 — Unified QR Refresh Policy
+
+```text
+Date: 2026-06-20
+Decision: Refreshing a QR uses the same display update path as refreshing text or
+  any other layout or content change. No QR-specific debounce or partial update.
+Context: User clarified that QR refresh is not a separate concern from normal
+  display refresh.
+Implementation contract:
+  - docs/qr_encoder_interface.md section QR Refresh Policy.
+  - docs/oled_text_display_interface.md Refresh Policy includes QR payload changes.
+Non-goals:
+  - QR-only debounce, partial framebuffer updates, or special refresh queues.
+Affected files:
+  - docs/qr_encoder_interface.md
+  - docs/oled_text_display_interface.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - Changing QR payload via a new layout update behaves like any other SET_CONTENT.
+Open questions:
+  - None.
+```
+
+## 2026-06-20 — Instruction-Driven QR (No Wait For IP)
+
+```text
+Date: 2026-06-20
+Decision: QR screens appear only when an explicit draw-QR instruction arrives with
+  a URL payload. The display does not wait, poll, or show placeholders for IP
+  availability.
+Context: User clarified that absence of a QR instruction is normal; there is no
+  need to anticipate "waiting for valid IP" UX in the display contract.
+Implementation contract:
+  - docs/qr_encoder_interface.md section Instruction-Driven QR Display.
+  - DisplayController applies instructions; it does not observe network readiness.
+Non-goals:
+  - WAITING screens, IP polling, or implicit setup states in the display stack.
+Affected files:
+  - docs/qr_encoder_interface.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - Text-only operation with no QR instruction is valid default behavior.
+Open questions:
+  - None.
 ```
 
 ## 2026-06-20 — Sporadic QR on Dynamic Layouts

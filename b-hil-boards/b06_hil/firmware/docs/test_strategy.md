@@ -109,13 +109,17 @@ tests remain under OLED Display Criteria above.
   `DisplayController`, not the renderer.
 - Switching from a QR layout to a text-only layout removes all QR pixels; the
   display must not keep a reserved QR zone between layouts.
+- Replacing a QR payload via a new layout update follows the same refresh rules as
+  any other display content change (no QR-specific policy).
 
 ### Dynamic layout behavior
 
 - Text-only layouts (`FULL_FOUR_LINES`, `FULL_TWO_LINES`, single-line layouts) are
   valid default states with no QR region.
-- QR layouts are occasional; tests must include at least one layout transition
-  away from QR to text-only.
+- QR layouts are occasional and instruction-driven; tests must include at least
+  one layout transition away from QR to text-only.
+- Absence of any draw-QR instruction is valid; no test shall require a waiting
+  or placeholder screen for URL availability.
 
 ### QR test record additions
 
