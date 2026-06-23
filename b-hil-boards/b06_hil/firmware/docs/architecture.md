@@ -43,7 +43,9 @@ flowchart TD
 
 - `main/`: ESP-IDF entry point. It must initialize and delegate.
 - `components/app_core/`: application orchestration, **sole caller of
-  `display_controller_*` in v1**, and main product rules. Display delivery is
+  `display_controller_*` in v1**, public display facade
+  (`app_core_display_show_template`, `app_core_display_show_qr_setup`), boot
+  display smoke/visual demo owner, and main product rules. Display delivery is
   defined in `docs/display_delivery_contract.md`.
 - `components/board/`: pin map, board details, and abstractions specific to
   `b06_hil`.
@@ -103,7 +105,11 @@ All display instructions (text or QR) follow **`docs/display_delivery_contract.m
 Summary:
 
 ```text
-instruction source (TBD)  --notify-->  app_core  --display_controller_*-->  display stack
+instruction source (TBD)
+        --app_core_display_show_*-->
+app_core
+        --display_controller_*-->
+display task / renderer / SSD1306 driver
 ```
 
 Rules:
@@ -112,6 +118,12 @@ Rules:
 - Text and QR instructions use the **same** notify → direct API path.
 - Instruction sources call **`app_core` display entry points (callback)**; no
   polling; no bypass of `app_core`. `esp_event` is not used for display in v1.
+- QR setup uses `app_core_display_show_qr_setup(url, text_lines, count)`.
+  `DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT` is not a valid text-template request path.
+- `setup_url` is a shared utility component for the root-only `http://IPv4`
+  product profile. It is not a network component.
+- `qr_encoder` contains only the vendored Nayuki `qrcodegen` C library; the
+  `display_qr` adapter owns matrix generation and static buffers.
 - The display architecture MUST NOT reference or depend on WiFi, network stacks, or
   connectivity state. Any such subsystem is fully decoupled.
 
@@ -134,5 +146,6 @@ ESP-IDF installation path.
 
 ## Pending Assumptions
 
-- Confirm physical OLED driver before enabling display hardware communication.
+- OLED controller for v1 is SSD1306 at `0x3C` or `0x3D`; SH1106 is out of scope
+  unless hardware changes.
 - Confirm external interfaces that must be tested from HIL.

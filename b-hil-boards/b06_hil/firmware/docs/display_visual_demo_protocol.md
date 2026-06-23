@@ -40,6 +40,7 @@ Disable the Kconfig for builds that must not cycle layouts at boot.
 | --- | --- |
 | Demo sequence | `components/app_core/app_core_display_demo.c` |
 | Public entry | `void app_core_run_visual_demo(void)` in `app_core_display_demo.h` |
+| Smoke entry | `void app_core_run_display_smoke(void)` in `app_core_display_demo.h` |
 | Boot wiring | `app_core_start()` in `app_core.c` |
 | Kconfig | `components/app_core/Kconfig` |
 
@@ -48,7 +49,8 @@ production delivery per `docs/display_delivery_contract.md`).
 
 ## Serial log contract
 
-Before each step (after the API call that updates the display):
+For each step, `app_core_display_demo.c` calls the step display API first. Then
+it logs the hold marker and delays:
 
 ```text
 DEMO_STEP i/N name=<step_id> hold_ms=<milliseconds>
@@ -64,6 +66,9 @@ DEMO_STEP i/N done
 - `<step_id>` is a short stable identifier (e.g. `FULL_FOUR_LINES`,
   `QR_SETUP`, `FULL_TWO_LINES`).
 - Log level: `ESP_LOGI` with tag `app_core_demo`.
+- If a step API fails, the implementation logs `demo step <name> failed: <err>`
+  and still emits the hold marker for the step. Tester records that step as
+  `FAIL` unless the handoff explicitly allows it.
 
 The tester MAY grep serial output for `DEMO_STEP` to confirm order and timing.
 
@@ -88,8 +93,9 @@ When `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO=y`:
 
 Total hold: 18 s (within 30 s limit).
 
-When Kconfig is `n`, only step 1 smoke runs (indefinite until next boot; no
-`DEMO_STEP` markers for the multi-step sequence).
+When Kconfig is `n`, `app_core_run_display_smoke()` shows only the same
+`FULL_FOUR_LINES` smoke screen (indefinite until next boot; no `DEMO_STEP`
+markers for the multi-step sequence).
 
 ## Implementer obligations
 

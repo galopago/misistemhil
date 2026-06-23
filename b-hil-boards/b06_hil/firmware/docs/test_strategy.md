@@ -100,6 +100,7 @@ tests remain under OLED Display Criteria above.
 - `setup_url_validate("https://192.168.4.1")` returns false.
 - `setup_url_validate("http://192.168.1.1/setup")` returns false (root only; no path).
 - `setup_url_format_ipv4(192, 168, 4, 1, buf, len)` writes `http://192.168.4.1`.
+- `setup_url_self_test()` returns `ESP_OK` during boot and logs the self-test pass.
 - Payload encodes site root; post-scan redirect to a subpath is out of firmware scope.
 
 ### Matrix generation
@@ -107,12 +108,16 @@ tests remain under OLED Display Criteria above.
 - `display_qr_generate("http://192.168.4.1")` succeeds with `width == 25`.
 - `display_qr_generate("http://1.1.1.1")` succeeds with `width == 21`.
 - Empty, null, or invalid product payloads return false without crash.
+- Invalid product URLs return false even though qrcodegen could encode arbitrary bytes.
 - Encoded product payloads fit in `64x64` at scale 2 with quiet zone 1.
 
 ### Integration with renderer
 
 - `QR_LEFT_TEXT_RIGHT` with canonical payload renders a scannable code on hardware
   when the physical OLED driver is active.
+- `DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT` through `display_controller_show_template`
+  returns `ESP_ERR_INVALID_ARG`; QR setup uses `display_controller_show_qr_setup`
+  / `app_core_display_show_qr_setup` only.
 - Invalid payload leaves the QR region blank; fallback text comes from
   `DisplayController`, not the renderer.
 - Switching from a QR layout to a text-only layout removes all QR pixels; the
@@ -143,9 +148,11 @@ Validation follows `docs/display_delivery_contract.md`.
 
 ### Caller discipline
 
-- Only `components/app_core/` includes `display_controller.h` in v1 firmware
-  (display component internals excluded from this grep rule).
-- No instruction-source component includes `display_controller.h` or `display.h`.
+- Direct includes of `display_controller.h` are limited to `components/app_core/`
+  and display component internals in v1 firmware.
+- Instruction-source components include `app_core.h`, not `display_controller.h`
+  or `display.h`; indirect exposure of `display_layout_template_t` through
+  `app_core.h` does not authorize direct display-controller calls.
 - Display component tree MUST NOT include WiFi/network headers.
 
 ### Notification path
@@ -154,6 +161,8 @@ Validation follows `docs/display_delivery_contract.md`.
 - Tests invoke `app_core` display entry points; no `esp_event` display transport in v1.
 - QR: `app_core` calls `display_controller_show_qr_setup` after `setup_url_validate`.
 - Invalid QR payload does not call display APIs.
+- Text: `app_core_display_show_template(DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT, ...)`
+  is not a valid QR path; use `app_core_display_show_qr_setup`.
 
 ### Non-requirements
 
@@ -189,6 +198,10 @@ For each manifest step:
 | Expected | Copied from implementer Demo Manifest |
 | Observed | Human operator description |
 | Result | PASS, FAIL, or BLOCKED |
+
+The current firmware logs each `DEMO_STEP ... hold_ms=...` **after** the display
+API call for that step and before the hold delay. If a step API returns an
+error, the firmware logs the error and still emits the hold marker for the step.
 
 ### Baseline v1 acceptance (when Kconfig `y`)
 

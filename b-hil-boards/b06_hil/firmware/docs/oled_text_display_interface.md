@@ -737,6 +737,17 @@ define other arrangements without changing the display task or driver.
 `QR_LEFT_TEXT_RIGHT` is one reference for a **temporary** setup-style screen. It
 must not be interpreted as a permanent QR slot on the display.
 
+API boundary for v1:
+
+- `QR_LEFT_TEXT_RIGHT` is a valid **layout shape** and internal template builder.
+- It MUST NOT be selected through the text-template path
+  (`display_controller_show_template` / `app_core_display_show_template`) because
+  that path has no QR payload parameter.
+- QR setup screens MUST use the explicit QR helper
+  (`app_core_display_show_qr_setup` → `display_controller_show_qr_setup`) so the
+  URL payload is supplied by the instruction and no hardcoded URL exists in the
+  controller.
+
 The implementation should document at least these reference templates:
 
 - `FULL_FOUR_LINES`: four compact lines across the full display.

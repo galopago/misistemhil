@@ -343,7 +343,11 @@ Validation plan:
   - Record measured flash/RAM after first integration.
 Open questions:
   - Instruction source identity (may be internal to app_core if centralized).
-  - Confirm components/setup_url/ and vendor path at implementation time.
+Closed by implementation review:
+  - setup_url component path: components/setup_url/
+  - Nayuki vendor path: components/qr_encoder/vendor/qrcodegen/
+  - qrcodegen.c blob pin recorded by implementer:
+    34f1002501fa2bcb0a054f4311795b8cbb977f5b
 ```
 
 ## DISPLAY_DELIVERY_CONTRACT
@@ -368,7 +372,8 @@ Expected changes:
   - Add app_core_display_show_template and app_core_display_show_qr_setup callbacks.
   - Route text and QR instructions to matching display_controller_* APIs inside app_core.
   - Validate QR payload shape with setup_url at app_core before display call.
-  - Ensure no module other than app_core includes display_controller.h in v1.
+  - Ensure no module outside app_core and display internals directly includes
+    display_controller.h in v1.
   - Ensure display tree excludes WiFi/network headers.
 Module boundaries and contracts:
   - Follow docs/display_delivery_contract.md as normative source.
@@ -382,6 +387,8 @@ Detailed behavior:
   - No application queue between instruction source and app_core.
   - display_task internal queue remains the only display pipeline queue.
   - Invalid QR payload rejected at app_core without display calls.
+  - display_controller_show_template rejects DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT;
+    QR layouts use display_controller_show_qr_setup with an explicit payload.
 Non-goals:
   - esp_event transport for display instructions in v1.
   - Instruction source direct calls to display_controller_* or display_set_*.
@@ -389,7 +396,8 @@ Non-goals:
   - Separate QR delivery channel or display/network coupling.
   - ISR-to-display calls.
 Acceptance criteria:
-  - Grep audit: only app_core includes display_controller.h in v1 firmware.
+  - Grep audit: only app_core and display component internals directly include
+    display_controller.h in v1 firmware.
   - Text and QR instructions both flow callback → app_core → direct API.
   - No display/app_core references to WiFi/network for screen selection.
   - docs/display_delivery_contract.md acceptance criteria satisfied.
@@ -446,6 +454,49 @@ Validation plan:
   - Tester Run 006: flash with Kconfig y, human observes each step, feedback.md entry.
 Open questions:
   - None.
+```
+
+## DISPLAY_V1_IMPLEMENTATION_SNAPSHOT
+
+```text
+ID: DISPLAY_V1_IMPLEMENTATION_SNAPSHOT
+Objective:
+  Align architecture documentation with the current display implementation so
+  future LLM implementers reproduce the same component paths, APIs, and QR
+  boundaries unless a new handoff changes them.
+Reason:
+  The implementer concretized app_core display facade, setup_url, Nayuki vendor
+  layout, display_qr static-buffer adapter, QR-only helper path, and boot visual demo.
+Authorized files:
+  - docs/architecture.md
+  - docs/display_delivery_contract.md
+  - docs/qr_encoder_interface.md
+  - docs/oled_text_display_interface.md
+  - docs/display_visual_demo_protocol.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/architect/decisions.md
+Expected changes:
+  - Document exact app_core public display API names.
+  - Document QR_LEFT_TEXT_RIGHT rejection from text-template path.
+  - Document setup_url and qr_encoder component paths.
+  - Document qrcodegen call shape and static memory model.
+  - Document boot visual demo behavior as implemented.
+Explicitly excluded:
+  - components/**, main/**, sdkconfig*, build, flash, debug, tester sign-off
+Module boundaries and contracts:
+  - Future implementers must preserve app_core as display facade.
+  - Future implementers must keep qrcodegen isolated behind display_qr.c.
+  - Future implementers must not add a second QR/display delivery path.
+Acceptance criteria:
+  - Normative docs specify exact current paths and APIs.
+  - Closed implementation details are moved out of open questions.
+  - Remaining open questions are product-level only (instruction source identity,
+    future URL extensions).
+Validation plan:
+  - Architect review only: no build or hardware validation in this role.
+Open questions:
+  - Product instruction source identity if not fully internal to app_core.
 ```
 
 ## ARCHITECT_ROLE_HARD_STOP

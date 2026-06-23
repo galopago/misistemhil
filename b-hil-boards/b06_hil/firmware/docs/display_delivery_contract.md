@@ -89,11 +89,11 @@ knows nor documents those subsystems.
 
 All types share the same notification → `app_core` → direct API path.
 
-| Instruction | `app_core` API call | Payload |
+| Instruction | Public `app_core` API | Internal `DisplayController` call | Payload |
 | --- | --- | --- |
-| Text template | `display_controller_show_template(...)` | Template id + ASCII lines |
-| Explicit layout | `display_controller_show_layout(...)` | `DisplayLayout` |
-| QR layout | `display_controller_show_qr_setup(...)` | `http://IPv4` string + optional ASCII lines |
+| Text template | `app_core_display_show_template(...)` | `display_controller_show_template(...)` | Template id + ASCII lines |
+| Explicit layout | none in v1 public app_core API | `display_controller_show_layout(...)` (display/app_core internals only) | `DisplayLayout` |
+| QR layout | `app_core_display_show_qr_setup(...)` | `display_controller_show_qr_setup(...)` | `http://IPv4` string + optional ASCII lines |
 
 Rules:
 
@@ -101,6 +101,9 @@ Rules:
   network-derived unless `app_core` explicitly chooses that product policy before
   calling the API.
 - Replacing content (text or QR) is always a new instruction through the same path.
+- `DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT` MUST NOT be passed through
+  `app_core_display_show_template(...)`. QR content uses
+  `app_core_display_show_qr_setup(...)` so the URL payload is explicit.
 
 ## Instruction Source → `app_core` Notification
 
@@ -127,7 +130,7 @@ Normative rules:
 - `esp_event` is **not** the v1 transport. A future architect handoff is required
   before switching to or adding an event-bus path.
 
-Illustrative public surface (implementer names may vary):
+Selected public surface (v1; future implementers SHOULD keep these exact names):
 
 ```c
 esp_err_t app_core_display_show_template(display_layout_template_t template_id,
@@ -141,6 +144,14 @@ esp_err_t app_core_display_show_qr_setup(const char *url,
 
 Each function validates input as needed, then calls the matching
 `display_controller_*` API.
+
+Implementation note:
+
+- `app_core.h` currently exposes `display_layout_template_t`, so it includes
+  `display_controller.h` to get that type. Instruction sources MUST include
+  `app_core.h`; they MUST NOT directly include `display_controller.h`.
+- Moving template IDs to a neutral header is a future refactor and requires a
+  new architect handoff. Do not invent a second public enum in v1.
 
 ### Deferred alternative (not v1)
 
@@ -156,6 +167,8 @@ When the instruction type is QR:
   display API, or `app_core` MUST reject the instruction without drawing.
 - Payload MUST be printable ASCII (`http://IPv4` product profile).
 - Optional companion lines follow the same ASCII rules as text instructions.
+- `DisplayController` does not validate URL shape; it trusts `app_core` and only
+  builds the layout from the payload it receives.
 
 `setup_url` validates **string shape only**. It does not imply a network origin.
 
@@ -177,6 +190,10 @@ Rules:
 - On failure, `app_core` MAY log; it MUST NOT poll-retry.
 - Refresh and coalescing follow `docs/oled_text_display_interface.md` for all
   instruction types equally.
+- `display_controller_show_template(DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT, ...)`
+  MUST return `ESP_ERR_INVALID_ARG` in v1. That template shape is still valid
+  internally, but only `display_controller_show_qr_setup(payload, ...)` may build
+  it because the payload is mandatory.
 
 ### Single-caller discipline
 
@@ -189,8 +206,12 @@ Forbidden:  any module  →  display_driver / renderer  (bypass)
 
 Enforcement:
 
-- Only `app_core.c` (and display component internals) should include
-  `display_controller.h` in v1 unless a future handoff widens callers.
+- Direct `display_controller.h` includes are allowed only inside
+  `components/app_core/` and display component internals in v1 unless a future
+  handoff widens callers.
+- Components outside `app_core` MUST include `app_core.h` for display requests,
+  not `display_controller.h`. Indirect inclusion through `app_core.h` does not
+  authorize calling `display_controller_*`.
 
 ## Threading and Ordering
 
@@ -203,10 +224,12 @@ Enforcement:
 
 ```text
 1. board + i2c_bus init
-2. display_start(config) + display_controller_init()
-3. app_core registers event handlers and/or accepts hook registration
-4. instruction sources may register/post
-5. default informational screen until an instruction replaces it
+2. boot self-tests that do not require display task ownership
+   (`display_geometry_self_test`, `setup_url_self_test`)
+3. resolve OLED config + `display_start(config)` + `display_controller_init()`
+4. optional app_core boot visual demo or smoke screen
+5. app_core registers/accepts product display instructions
+6. latest instruction replaces the boot screen
 ```
 
 Instructions MUST NOT be delivered before step 3 completes.
@@ -229,8 +252,11 @@ An implementation satisfies this contract if:
 - Text and QR instructions both flow notify → `app_core` → direct API only.
 - No display or `app_core` code references WiFi/network APIs for choosing screens.
 - No firmware loop polls for pending QR or text instructions.
-- Valid QR instructions render on hardware; invalid QR payloads are rejected at
-  `app_core` without display calls.
+- Valid QR instructions render on hardware through `app_core_display_show_qr_setup`.
+- Invalid QR payloads are rejected at `app_core` before
+  `display_controller_show_qr_setup` is called.
+- `DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT` is rejected by the text-template public
+  path and is reachable only through the explicit QR setup helper.
 - Internal `display_task` queue remains the only display pipeline queue.
 
 ## Suggested Validation
@@ -241,6 +267,8 @@ Implementer:
 - Grep audit: display component tree excludes WiFi/network headers.
 - Test: post text instruction event → template API called.
 - Test: post QR instruction event → `display_controller_show_qr_setup` called.
+- Test: calling `display_controller_show_template(DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT, ...)`
+  returns `ESP_ERR_INVALID_ARG`.
 
 Tester:
 

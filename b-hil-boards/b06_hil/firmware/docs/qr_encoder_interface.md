@@ -197,25 +197,31 @@ Rules:
 Rationale: permissive license, small C implementation, standards-compliant QR
 Code encoder suitable for embedded firmware without copyleft obligations.
 
-### Integration layout (implementer)
+### Selected integration layout (v1)
 
-Preferred component layout:
+The v1 firmware uses this exact component layout:
 
 ```text
 components/qr_encoder/
   CMakeLists.txt
-  vendor/qrcodegen/     # upstream C sources plus LICENSE
-  include/qr_encoder.h  # optional thin wrapper
+  vendor/qrcodegen/
+    qrcodegen.c
+    qrcodegen.h
+    LICENSE
 ```
-
-Alternative acceptable only if recorded in implementer handoff:
-`components/display/vendor/qrcodegen/`.
 
 Requirements:
 
 - Copy upstream `LICENSE` into the vendor tree.
-- Pin upstream version or commit in `agent-workspaces/architect/decisions.md`.
+- Pin upstream version or commit in `agent-workspaces/architect/decisions.md` or
+  `agent-workspaces/implementer/handoff.md`; the current v1 integration records
+  `qrcodegen.c` blob `34f1002501fa2bcb0a054f4311795b8cbb977f5b`.
 - Do not hand-roll QR encoding in `display_qr.c`.
+- Do not add a `components/qr_encoder/include/` wrapper in v1 unless a future
+  handoff requires it. `display_qr.c` includes Nayuki `qrcodegen.h` directly via
+  `PRIV_REQUIRES qr_encoder`.
+- Keep Nayuki includes out of `ViewRenderer` and `DisplayController`; only
+  `display_qr.c` adapts qrcodegen to `display_qr_matrix_t`.
 
 ### Encoding rules
 
@@ -225,7 +231,10 @@ Requirements:
 - ECI metadata: not used in v1.
 - Payload MUST NOT be compressed, shortened, or rewritten before encoding except
   for ASCII sanitization (`?` replacement) defined in the visual contract.
-- Mask pattern: encoder MAY use its standard penalty-based mask selection.
+- Nayuki call shape: `qrcodegen_encodeBinary(..., qrcodegen_Ecc_LOW, 1, 2,
+  qrcodegen_Mask_AUTO, false)`.
+- Mask pattern: use `qrcodegen_Mask_AUTO`.
+- Boosting ECC: disabled (`false`) so the requested LOW profile remains stable.
 - Golden tests MUST verify `module_count` and on-screen fit, not exact mask bits.
 
 ## Generator Public API
@@ -247,12 +256,20 @@ void display_qr_release(display_qr_matrix_t *matrix);
 `display_qr_generate` behavior:
 
 1. Reject `NULL` payload, empty string, or `NULL` matrix output.
-2. Optionally require `setup_url_validate(payload)` success before encoding.
+2. Require `setup_url_validate(payload)` success before encoding.
 3. Sanitize non-printable/non-ASCII bytes to `?` per display contract.
 4. Reject sanitized payload if longer than 32 bytes or if version would exceed 2.
 5. Encode with Nayuki using byte mode and LOW error correction.
 6. On success, fill `matrix` with square `width == height == module_count` and
    `modules` pointing at dark-module storage (`non-zero` = dark).
+
+Failure behavior:
+
+- If `matrix != NULL`, failures MUST leave caller-visible fields zeroed
+  (`width = 0`, `height = 0`, `modules = NULL`) unless the input was a `NULL`
+  matrix pointer.
+- `display_qr_generate` MUST return `false` for invalid product URLs even if
+  Nayuki could encode them as arbitrary bytes.
 
 `display_qr_module_at`:
 
@@ -266,10 +283,14 @@ void display_qr_release(display_qr_matrix_t *matrix);
 
 ## Memory and Concurrency (v1)
 
-- Matrix storage: one **static internal buffer** sized for version 2 (25 x 25 =
-  625 bytes) inside `display_qr.c`.
-- No heap allocation in the base encoder path.
-- Only one active matrix view at a time in v1.
+- Matrix storage: one **static internal module buffer** sized for version 2
+  (25 x 25 = 625 bytes) inside `display_qr.c`.
+- Nayuki working storage: static `qrcodegen_BUFFER_LEN_FOR_VERSION(2)` buffers
+  for QR output and input copy.
+- No heap allocation in the encoder path.
+- Only one active matrix view at a time in v1. A new successful
+  `display_qr_generate` call overwrites the static view returned by the previous
+  call.
 - Optional optimization: cache last successful payload hash or string compare in
   `display_qr` to skip re-encoding when the display refreshes unchanged content.
 - Only the `display_task` context MAY call `display_qr_generate` in v1.
@@ -287,6 +308,7 @@ Recommended component: `components/setup_url/`.
 bool setup_url_format_ipv4(unsigned a, unsigned b, unsigned c, unsigned d,
                            char *out, size_t out_len);
 bool setup_url_validate(const char *url);
+esp_err_t setup_url_self_test(void);
 ```
 
 Rules:
@@ -294,6 +316,9 @@ Rules:
 - `setup_url_format_ipv4` writes `http://a.b.c.d` when all octets are `0..255`
   and `out_len` is sufficient (minimum 15 bytes for `http://0.0.0.0` plus NUL).
 - `setup_url_validate` accepts only the v1 product profile (`http://IPv4`).
+- `setup_url_self_test` is a boot-time sanity check callable from `app_core_start`
+  after I2C init and before display content is shown. It is not a replacement
+  for tester validation.
 - An instruction source includes the finished URL string in a QR display instruction.
 - `app_core` validates with `setup_url` and calls `display_controller_show_qr_setup`
   or equivalent layout API.
@@ -332,6 +357,7 @@ An implementation satisfies this document if:
   1 per the visual contract.
 - `setup_url_validate` and `setup_url_format_ipv4` exist and match the v1
   profile.
+- `setup_url_self_test` covers canonical valid/invalid profile cases at boot.
 - Display controller continues to accept externally supplied payload strings.
 - Renderer and controller remain free of Nayuki includes.
 - Switching from a QR layout to a text-only layout removes QR from the screen with
@@ -362,10 +388,7 @@ These items do not block encoder or delivery-contract implementation:
 
 1. **Instruction source identity** — component or role that emits display
    instructions (may live entirely inside `app_core` if centralized).
-2. **`setup_url` component path** — confirm `components/setup_url/` at implementation.
-3. **Nayuki vendor path** — confirm `components/qr_encoder/vendor/` layout at implementation.
-4. **Measured flash/RAM budget** — record after first integration build.
-5. **Future URL extensions** — `https://`, port, path in QR payload, IPv6 remain
+2. **Future URL extensions** — `https://`, port, path in QR payload, IPv6 remain
    out of scope until a new product profile is authorized.
 
 Closed in v1 architecture:
@@ -375,3 +398,9 @@ Closed in v1 architecture:
 - **WiFi/network decoupling** — display architecture MUST NOT reference or depend
   on connectivity subsystems.
 - **Notification transport** — callback / direct `app_core` APIs (not `esp_event`).
+- **`setup_url` component path** — `components/setup_url/`.
+- **Nayuki vendor path** — `components/qr_encoder/vendor/qrcodegen/`.
+- **Nayuki pin** — `qrcodegen.c` blob
+  `34f1002501fa2bcb0a054f4311795b8cbb977f5b`.
+- **Measured QR integration size** — implementer handoff records
+  `b06_hil_firmware.bin` `0x39f00` after QR integration.

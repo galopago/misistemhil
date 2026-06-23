@@ -63,6 +63,57 @@ Open questions:
   - None.
 ```
 
+## 2026-06-23 — Display v1 Implementation Snapshot
+
+```text
+Date: 2026-06-23
+Decision: Document the current implemented display v1 structure as the reference
+  shape future implementers should reproduce unless a new architect handoff changes it.
+Context: The implementer concretized display delivery, setup_url, QR encoding,
+  and visual demo code. Architecture docs must now reduce variation for future
+  LLM implementers.
+Implementation contract:
+  - app_core exposes app_core_display_show_template and
+    app_core_display_show_qr_setup as the public display facade.
+  - app_core validates QR payloads with setup_url_validate before calling
+    display_controller_show_qr_setup.
+  - display_controller_show_template rejects DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT;
+    QR setup uses display_controller_show_qr_setup with explicit payload.
+  - setup_url component path is components/setup_url/ with format, validate,
+    and self-test helpers.
+  - Nayuki qrcodegen is vendored at components/qr_encoder/vendor/qrcodegen/.
+  - Current qrcodegen.c blob pin:
+    34f1002501fa2bcb0a054f4311795b8cbb977f5b.
+  - display_qr.c is the only qrcodegen adapter; it uses static version-2 buffers,
+    byte mode, LOW ECC, Mask_AUTO, and boostEcl=false.
+  - Boot visual demo lives in components/app_core/app_core_display_demo.c and
+    runs through app_core_display_show_* APIs only.
+Expected behavior:
+  - Text and QR delivery stay on one app_core → DisplayController path.
+  - No hardcoded QR URL exists in display_controller_show_template.
+  - Future QR payload expansion, wrapper components, or alternate transport
+    require a new architect handoff.
+Non-goals:
+  - Approving implementation quality, build results, or tester sign-off.
+  - Moving template enums to a neutral header in this decision.
+Consequences:
+  - Docs now describe exact v1 component paths and public API names.
+Affected files:
+  - docs/architecture.md
+  - docs/display_delivery_contract.md
+  - docs/qr_encoder_interface.md
+  - docs/oled_text_display_interface.md
+  - docs/display_visual_demo_protocol.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/architect/decisions.md
+Validation expectations:
+  - A future implementer following docs should create the same components and
+    helper boundaries without adding an alternate QR/display path.
+Open questions:
+  - Product instruction source identity remains open if not internal to app_core.
+```
+
 ## 2026-06-20 — Portable I2C Bus Contract
 
 ```text
