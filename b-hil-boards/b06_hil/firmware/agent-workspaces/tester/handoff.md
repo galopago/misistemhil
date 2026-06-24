@@ -16,7 +16,9 @@ Before starting any task in this file, run the **Role Boundary Check**:
 
 **Host procedures:** see `procedures.md` (NVS credential erase via `esptool`).
 
-Run 020: **PASS** — `WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2` (Entries 021–022); AP restore deferred.
+Run 021: **PASS** — `WIFI_FACTORY_RESET_RUNTIME` (Entry 024; boot/short-press deferred).
+
+Run 020: **PASS** — `WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2` (Entries 021–023); AP restore deferred.
 
 Run 019: **PARTIAL PASS** — `ERROR_LED_RUNTIME_LINK_STATUS` + `WIFI_RUNTIME_RECONNECT`; boot-lock regression PASS; AP outage blocked.
 
@@ -35,6 +37,20 @@ Run 012: **PARTIAL PASS** — superseded by Run 013 for POST UX.
 Run 011: **PARTIAL PASS** — GET / formulario OK; POST falló con 431 (512 bytes). Corregido en Run 012 config.
 
 Run 006: **PASS** completo para `DISPLAY_VISUAL_DEMO_PROTOCOL` (demo retired).
+
+## WIFI_FACTORY_RESET_RUNTIME — Run 021
+
+```text
+ID: WIFI_FACTORY_RESET_RUNTIME (Run 021)
+Source: docs/wifi_factory_reset_architecture.md, architect handoff
+Commands: build/flash; 70s serial during operator GPIO7 hold (portal mode)
+Result:
+  Build 0xde220, static, runtime reset serial: PASS
+  Connect-cycle abort + portal + QR: PASS (serial + human Entry 024)
+  Reprovision vitriolina after reset: PASS (human Entry 024)
+Evidence: test_runs.md Run 021, feedback Entry 024, /tmp/b06_hil_factory_reset_user_test.txt
+Recommendation: Accept WIFI_FACTORY_RESET_RUNTIME for v1 operator path.
+```
 
 ## ERROR_LED_RUNTIME_LINK_STATUS + WIFI_RUNTIME_RECONNECT — Run 019
 

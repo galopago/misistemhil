@@ -8,6 +8,23 @@ maintained in English.
 
 ## Entries
 
+### Entry 024 — Run 021 factory reset + reprovision vitriolina (operator confirmed)
+
+```text
+Date: 2026-06-23
+Person: Human operator (project owner)
+Context: WIFI_FACTORY_RESET_RUNTIME / Run 021, after GPIO7 10s reset from connect cycle
+
+Human observation:
+  - Portal QR + setup screen correct after factory reset — PASS
+  - POST vitriolina provisioning: WIFI/CONNECTING then WIFI OK + IP/MAC — PASS
+  - LED off when connected; mobile success page; AP teardown — PASS (matches expected UX)
+
+Classification:
+  - Factory reset runtime + reprovision (criterion 7): PASS (human)
+  - Full operator flow after connect-cycle abort: PASS (human)
+```
+
 ### Entry 023 — Run 020 post-recovery portal OK (operator confirmed)
 
 ```text

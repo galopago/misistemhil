@@ -32,7 +32,7 @@ explicit product events, and OLED feedback during recovery.
 | --- | --- |
 | Saved credentials fail at **cold boot** | Up to 5 attempts → `SAVED_FAILURE_LOCKED`; fast LED; no portal reopen; factory reset to recover |
 | Link lost at **runtime** with valid creds | Unbounded reconnect with capped backoff; **never** enter boot lock from runtime loss alone |
-| Factory reset (GPIO7 hold 2000 ms) | Erase credentials; cancel reconnect task; restart portal |
+| Factory reset (GPIO7 hold 10 s) | Erase credentials; cancel reconnect task; restart portal |
 
 Runtime reconnect MUST NOT erase credentials, MUST NOT reopen the provisioning AP,
 and MUST NOT set `s_locked_disconnected` or `s_saved_policy_exhausted`.

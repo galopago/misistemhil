@@ -329,10 +329,15 @@ Validation follows `docs/wifi_provisioning_architecture.md`.
   WPA2/WPA3 transition or WPA3-SAE Personal router before declaring v1 WiFi
   provisioning accepted on the current bench.
 - Reboot with saved but unreachable or invalid credentials does not erase NVS and
-  does not reopen AP; the device remains disconnected until factory reset.
-- Holding `GPIO7` active-low for at least `2000 ms` at boot erases NVS namespace
-  `wifi_prov` and starts AP provisioning again.
-- A short or released `GPIO7` input at boot must not erase credentials.
+  does not reopen AP; the device remains in connect cycle until factory reset.
+- Holding `GPIO7` active-low for at least `10000 ms` (10 s) erases NVS namespace
+  `wifi_prov` and starts AP provisioning again (boot or runtime per
+  `docs/wifi_factory_reset_architecture.md`).
+- **Run 021 validated:** runtime reset from connect cycle, portal idempotent 2×,
+  reprovision after reset (Entry 024).
+- **Deferred follow-up (non-blocking v1):** boot hold 10 s, boot short-press negative,
+  reset from stable `WIFI OK` only.
+- A short or released `GPIO7` input before 10 s must not erase credentials.
 
 ### WiFi provisioning test record additions
 

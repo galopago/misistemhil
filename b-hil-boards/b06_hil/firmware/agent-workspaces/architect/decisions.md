@@ -1286,3 +1286,82 @@ Affected files:
   - docs/wifi_connect_cycle_architecture.md, error_led_connect_cycle_architecture.md
   - docs/wifi_provisioning_architecture.md, agent handoffs
 ```
+
+---
+
+## 2026-06-23 — WiFi factory reset at runtime
+
+```text
+Date: 2026-06-23
+Decision: Extend GPIO7 factory reset to runtime, not only cold boot.
+Context: Connect cycle v2 runs indefinitely with credentials in NVS; boot-only
+  erase forces power-cycle plus precise boot-window hold. Operator needs erase +
+  portal while connected or cycling.
+Alternatives considered:
+  - esp_restart after erase: rejected as primary path (worse UX, slower).
+  - Shorter hold (2000 ms): superseded — operator requires 10000 ms to prevent accidental erase.
+  - Tap-to-erase: rejected (accidental erase risk).
+Implementation contract:
+  - docs/wifi_factory_reset_architecture.md
+  - Monitor task wifi_fr_mon in app_core_wifi; shared 10000 ms hold sampling.
+  - wifi_provisioning_factory_reset_to_portal(): abort cycle, stop STA, start portal.
+  - run_sta_connect_attempt polls abort/credentials every <= 100 ms.
+  - FACTORY_RESET_HOLD_MS=10000 (update legacy 2000 in app_core_wifi.c).
+Expected behavior:
+  - Hold GPIO7 10 s anywhere: NVS wifi_prov erased; portal; LED solid ON.
+  - Short press: no change.
+Consequences:
+  - Handoff WIFI_FACTORY_RESET_RUNTIME for implementer.
+  - wifi_provisioning_architecture.md Factory Reset section updated.
+Affected files:
+  - docs/wifi_factory_reset_architecture.md (new)
+  - docs/wifi_provisioning_architecture.md, architecture.md
+  - agent-workspaces/architect/handoff.md
+Validation expectations:
+  - Runtime reset from CONNECTED and from connect-cycle-outage without reboot.
+Open questions:
+  - None.
+```
+
+---
+
+## 2026-06-23 — Factory reset hold duration 10 s
+
+```text
+Date: 2026-06-23
+Decision: FACTORY_RESET_HOLD_MS = 10000 (10 s) for boot and runtime factory reset.
+Context: Operator requested longer hold to avoid accidental credential erase.
+  Supersedes 2000 ms hold in prior v1 boot implementation and initial runtime draft.
+Consequences:
+  - docs/wifi_factory_reset_architecture.md and related specs updated.
+  - Implementer MUST change app_core_wifi.c FACTORY_RESET_HOLD_MS from 2000 to 10000.
+Affected files:
+  - docs/wifi_factory_reset_architecture.md, handoffs, test_strategy, procedures
+Open questions:
+  - None.
+```
+
+---
+
+## 2026-06-23 — Factory reset as-built documentation (Run 021)
+
+```text
+Date: 2026-06-23
+Decision: Publish implementation reference for validated factory reset v1.
+Context: Run 021 PASS operator-critical path; tester Entry 024 reprovision OK.
+Record: docs/wifi_factory_reset_implementation_reference.md
+Key as-built facts:
+  - Boot: factory_reset_requested_at_boot + shared hold helpers; no wait-for-release
+  - Runtime: wifi_fr_mon incremental counter (not blocking hold_confirmed)
+  - Portal API: vTaskDelete wifi_rt_rc; abort flag cleared before start_ap_portal
+  - Abort: factory_reset_should_abort = flag OR !wifi_credentials_load
+  - Poll: FACTORY_RESET_CONNECT_POLL_MS=100 in attempt wait, backoff, alert delay
+  - Hold: FACTORY_RESET_HOLD_MS=10000 boot and runtime
+Validated (Run 021): connect-cycle reset, portal idempotent, reprovision.
+Deferred: boot hold, short-press, WIFI OK-only reset.
+Affected files:
+  - docs/wifi_factory_reset_implementation_reference.md (new)
+  - docs/wifi_factory_reset_architecture.md, handoffs, test_strategy, procedures
+Open questions:
+  - None.
+```

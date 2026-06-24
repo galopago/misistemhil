@@ -16,8 +16,10 @@
 
 static const char *TAG = "app_core_wifi";
 
-#define FACTORY_RESET_HOLD_MS 2000U
+#define FACTORY_RESET_HOLD_MS 10000U
 #define FACTORY_RESET_SAMPLE_MS 50U
+#define FACTORY_RESET_MONITOR_STACK 3072U
+#define FACTORY_RESET_MONITOR_PRIORITY 6
 #define PROV_SETUP_LINE_JOIN "1 JOIN"
 #define PROV_SETUP_LINE_SCAN_QR "2 SCAN QR"
 #define PROV_SETUP_SSID_PREFIX_LEN 7
@@ -96,7 +98,7 @@ static void show_provisioning_setup_display(const wifi_prov_event_info_t *info)
     (void)app_core_display_show_qr_setup(url, lines, 4);
 }
 
-static bool factory_reset_requested(void)
+static esp_err_t factory_reset_gpio_configure(void)
 {
     const b06_hil_board_pins_t *pins = board_pins();
     gpio_config_t config = {
@@ -106,13 +108,20 @@ static bool factory_reset_requested(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
-    ESP_RETURN_ON_FALSE(gpio_config(&config) == ESP_OK, false, TAG, "gpio config failed");
+    return gpio_config(&config) == ESP_OK ? ESP_OK : ESP_FAIL;
+}
 
+static bool factory_reset_button_pressed(void)
+{
+    const b06_hil_board_pins_t *pins = board_pins();
+    return gpio_get_level(pins->factory_reset_switch) == BOARD_FACTORY_RESET_ACTIVE_LEVEL;
+}
+
+static bool factory_reset_hold_confirmed(void)
+{
     int64_t pressed_ms = 0;
     while (pressed_ms < (int64_t)FACTORY_RESET_HOLD_MS) {
-        const int level = gpio_get_level(pins->factory_reset_switch);
-        const bool pressed = level == BOARD_FACTORY_RESET_ACTIVE_LEVEL;
-        if (!pressed) {
+        if (!factory_reset_button_pressed()) {
             return false;
         }
 
@@ -120,8 +129,94 @@ static bool factory_reset_requested(void)
         pressed_ms += (int64_t)FACTORY_RESET_SAMPLE_MS;
     }
 
+    return true;
+}
+
+static bool factory_reset_requested_at_boot(void)
+{
+    if (factory_reset_gpio_configure() != ESP_OK) {
+        return false;
+    }
+
+    if (!factory_reset_button_pressed()) {
+        return false;
+    }
+
+    if (!factory_reset_hold_confirmed()) {
+        return false;
+    }
+
     ESP_LOGW(TAG, "factory reset requested");
     return true;
+}
+
+static void factory_reset_wait_for_release(void)
+{
+    while (factory_reset_button_pressed()) {
+        vTaskDelay(pdMS_TO_TICKS(FACTORY_RESET_SAMPLE_MS));
+    }
+}
+
+static void factory_reset_runtime_sequence(void)
+{
+    ESP_LOGW(TAG, "factory reset requested (runtime)");
+
+    esp_err_t err = wifi_credentials_erase();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "factory reset erase failed err=%s", esp_err_to_name(err));
+        return;
+    }
+
+    err = wifi_provisioning_factory_reset_to_portal();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "factory reset portal transition failed err=%s", esp_err_to_name(err));
+        return;
+    }
+
+    ESP_LOGI(TAG, "factory reset complete portal_active=true");
+}
+
+static void factory_reset_monitor_task(void *arg)
+{
+    (void)arg;
+
+    if (factory_reset_gpio_configure() != ESP_OK) {
+        ESP_LOGE(TAG, "factory reset monitor gpio init failed");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    int64_t pressed_ms = 0;
+    while (true) {
+        if (factory_reset_button_pressed()) {
+            vTaskDelay(pdMS_TO_TICKS(FACTORY_RESET_SAMPLE_MS));
+            if (factory_reset_button_pressed()) {
+                pressed_ms += (int64_t)FACTORY_RESET_SAMPLE_MS;
+                if (pressed_ms >= (int64_t)FACTORY_RESET_HOLD_MS) {
+                    factory_reset_runtime_sequence();
+                    factory_reset_wait_for_release();
+                    pressed_ms = 0;
+                }
+            } else {
+                pressed_ms = 0;
+            }
+        } else {
+            pressed_ms = 0;
+            vTaskDelay(pdMS_TO_TICKS(FACTORY_RESET_SAMPLE_MS));
+        }
+    }
+}
+
+static esp_err_t factory_reset_monitor_start(void)
+{
+    const BaseType_t ok = xTaskCreate(factory_reset_monitor_task, "wifi_fr_mon",
+                                      FACTORY_RESET_MONITOR_STACK, NULL,
+                                      FACTORY_RESET_MONITOR_PRIORITY, NULL);
+    if (ok != pdPASS) {
+        ESP_LOGE(TAG, "factory reset monitor task create failed");
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
 }
 
 static void on_wifi_prov_event(const wifi_prov_event_info_t *info, void *ctx)
@@ -194,10 +289,10 @@ esp_err_t app_core_wifi_start(void)
     }
 
     bool credentials_erased = false;
-    if (factory_reset_requested()) {
+    if (factory_reset_requested_at_boot()) {
         err = wifi_credentials_erase();
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "factory reset erase failed: %s", esp_err_to_name(err));
+            ESP_LOGE(TAG, "factory reset erase failed err=%s", esp_err_to_name(err));
             return err;
         }
         credentials_erased = true;
@@ -205,6 +300,8 @@ esp_err_t app_core_wifi_start(void)
 
     ESP_RETURN_ON_ERROR(wifi_provisioning_init(on_wifi_prov_event, NULL), TAG,
                         "wifi provisioning init failed");
+
+    ESP_RETURN_ON_ERROR(factory_reset_monitor_start(), TAG, "factory reset monitor start failed");
 
     wifi_credentials_t credentials = {0};
     const bool has_credentials = !credentials_erased && wifi_credentials_load(&credentials);

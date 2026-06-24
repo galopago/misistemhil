@@ -26,6 +26,7 @@ Before starting any task in this file, run the **Role Boundary Check**:
 - `ERROR_LED_RUNTIME_LINK_STATUS`: **implemented** (runtime link_status LED updates; tester validation pending).
 - `WIFI_RUNTIME_RECONNECT`: **implemented** (v1; superseded by v2 connect cycle).
 - `WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2`: **implemented and operator-validated** (2026-06-23).
+- `WIFI_FACTORY_RESET_RUNTIME`: **implemented and operator-validated** (Run 021, 2026-06-23).
 - `WIFI_PROVISIONING_ARCHITECTURE`: **Run 013 POST PASS, saved boot reliability FAIL**
   — saved credentials connect intermittently on cold reboot; corrective task
   `WIFI_PROVISIONING_SAVED_BOOT_RELIABILITY` **implemented** (pending tester 10-boot sweep).
@@ -105,7 +106,58 @@ addressed by `WIFI_PROVISIONING_SAVED_BOOT_RELIABILITY` (tester 10-boot sweep pe
 `ERROR_LED_RUNTIME_LINK_STATUS` is complete (tester validation pending).
 `WIFI_RUNTIME_RECONNECT` is complete (v1; superseded by v2).
 `WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2` is complete (**operator-validated** 2026-06-23).
+`WIFI_FACTORY_RESET_RUNTIME` is complete (**operator-validated** Run 021, 2026-06-23).
 Do not start `I2C_BUS_PHASE3` unless a new architect handoff activates it.
+
+## WIFI_FACTORY_RESET_RUNTIME
+
+```text
+ID: WIFI_FACTORY_RESET_RUNTIME
+Source:
+  - agent-workspaces/architect/handoff.md, WIFI_FACTORY_RESET_RUNTIME
+  - docs/wifi_factory_reset_architecture.md
+  - docs/wifi_factory_reset_implementation_reference.md (as-built record)
+Fix:
+  app_core_wifi.c:
+    - FACTORY_RESET_HOLD_MS=10000, FACTORY_RESET_SAMPLE_MS=50
+    - Shared helpers: factory_reset_gpio_configure, factory_reset_button_pressed,
+      factory_reset_hold_confirmed, factory_reset_requested_at_boot
+    - factory_reset_monitor_task (wifi_fr_mon, stack 3072, priority 6)
+    - factory_reset_runtime_sequence: erase then wifi_provisioning_factory_reset_to_portal
+    - factory_reset_wait_for_release after runtime reset
+  wifi_provisioning.c:
+    - s_factory_reset_abort, factory_reset_should_abort (flag or !credentials_load)
+    - FACTORY_RESET_CONNECT_POLL_MS=100 in run_sta_connect_attempt + delay_interruptible_ms
+    - wifi_provisioning_factory_reset_to_portal(): vTaskDelete wifi_rt_rc, stop WiFi, portal
+Modified files:
+  - components/app_core/app_core_wifi.c
+  - components/wifi_provisioning/include/wifi_provisioning.h
+  - components/wifi_provisioning/wifi_provisioning.c
+Build result:
+  - Success (Run 021 firmware 0xde220)
+Status: Complete — operator-validated Run 021 (Entry 024).
+
+As-built serial log checklist (regression):
+
+Runtime reset sequence (in order):
+  - W app_core_wifi: factory reset requested (runtime)
+  - I wifi_prov: factory reset abort connect cycle
+  - I wifi_prov: factory reset stopping wifi
+  - I wifi_prov: starting SoftAP ssid=HIL-06-XXXX
+  - I wifi_prov: provisioning portal ready at http://192.168.4.1
+  - I app_core_wifi: factory reset complete portal_active=true
+
+Boot reset (when tested):
+  - W app_core_wifi: factory reset requested   /* no (runtime) suffix */
+
+Monitor vs boot:
+  - Boot: factory_reset_hold_confirmed() blocks startup task
+  - Runtime: incremental pressed_ms counter + double sample; NOT blocking hold_confirmed
+  - Runtime only: factory_reset_wait_for_release() after reset
+
+Run 021 validated: connect-cycle abort, portal 2x, reprovision.
+Deferred: boot hold 10s, short-press, WIFI OK-only reset.
+```
 
 ## WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2
 

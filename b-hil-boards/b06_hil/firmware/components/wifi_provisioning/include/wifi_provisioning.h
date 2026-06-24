@@ -49,6 +49,7 @@ typedef void (*wifi_prov_event_cb_t)(const wifi_prov_event_info_t *info, void *c
 esp_err_t wifi_provisioning_init(wifi_prov_event_cb_t cb, void *ctx);
 esp_err_t wifi_provisioning_start_ap_portal(void);
 esp_err_t wifi_provisioning_connect_saved(const wifi_credentials_t *credentials);
+esp_err_t wifi_provisioning_factory_reset_to_portal(void);
 esp_err_t wifi_provisioning_stop(void);
 bool wifi_provisioning_portal_active(void);
 bool wifi_provisioning_locked_disconnected(void);

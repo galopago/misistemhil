@@ -345,30 +345,39 @@ bool wifi_credentials_validate(const wifi_credentials_t *credentials);
 
 ## Factory Reset Contract
 
+Full contract (boot + runtime): **`docs/wifi_factory_reset_architecture.md`**.
+
 Factory reset uses `GPIO7` active-low as documented in
 `docs/esp32_c3_supermini_connections.md`.
 
-Boot behavior:
+### Boot behavior
 
 1. `app_core_start()` initializes board pin access before WiFi provisioning
    decisions.
 2. It samples the factory reset switch during early boot.
 3. The reset request is valid only if the input is active-low continuously for at
-   least `2000 ms`.
+   least `10000 ms` (10 s).
 4. On a valid reset request, erase `wifi_prov` credentials before loading WiFi
    state.
 5. After erase, enter provisioning AP mode.
 
-The reset button is the only v1 recovery path from saved but failing credentials.
-Do not add a web reset, serial command, or automatic erase policy without a new
-architect handoff.
+### Runtime behavior (v2 extension)
+
+After `wifi_provisioning_init()`, `app_core_wifi` runs monitor task `wifi_fr_mon`.
+Hold `GPIO7` ≥ `10000 ms` (10 s) at any time erases credentials and transitions to the
+provisioning portal without requiring a reboot. See
+`docs/wifi_factory_reset_architecture.md` for abort timing, connect-cycle
+interaction, and `wifi_provisioning_factory_reset_to_portal()`.
+
+The reset button is the only v1 recovery path from saved credentials. Do not add a
+web reset, serial command, or automatic erase policy without a new architect handoff.
 
 ## Provisioning State Machine
 
 ```mermaid
 flowchart TD
     Boot[Boot] --> ResetCheck[Check_factory_reset]
-    ResetCheck -->|pressed_2000ms| ClearCredentials[Erase_wifi_prov_NVS]
+    ResetCheck -->|pressed_10000ms| ClearCredentials[Erase_wifi_prov_NVS]
     ResetCheck -->|not_pressed| LoadCredentials[Load_credentials]
     ClearCredentials --> StartProvisioning[Start_open_AP_and_HTTP]
     LoadCredentials -->|missing_or_invalid| StartProvisioning
@@ -1655,7 +1664,7 @@ Canonical startup order:
 1. app_main calls app_core_start().
 2. app_core initializes board pin access needed for factory reset.
 3. app_core initializes NVS through wifi_credentials_init().
-4. app_core checks factory reset GPIO7 active-low for 2000 ms.
+4. app_core checks factory reset GPIO7 active-low for 10000 ms (10 s).
 5. If reset is active, erase wifi_prov credentials.
 6. app_core initializes wifi_provisioning with a `wifi_prov_event_cb_t` callback.
 7. app_core loads wifi credentials.
@@ -1784,7 +1793,7 @@ An implementation satisfies this architecture if:
   backoff, and per-attempt diagnostics.
 - Saved credential connection failure at boot does not erase credentials and does
   not reopen AP.
-- Holding `GPIO7` active-low for at least `2000 ms` at boot erases credentials and
+- Holding `GPIO7` active-low for at least `10000 ms` (10 s) at boot erases credentials and
   enters provisioning AP mode.
 - Display updates, including setup QR, are routed through `app_core` display APIs.
 - Display components do not include WiFi, HTTP, or NVS credential headers.
@@ -1842,7 +1851,7 @@ Tester:
   10-boot sweep.
 - Reboot with saved but unreachable network and device remains disconnected until
   factory reset.
-- Hold `GPIO7` active-low at boot for at least `2000 ms`; credentials erase and AP
+- Hold `GPIO7` active-low at boot for at least `10000 ms` (10 s); credentials erase and AP
   starts again.
 - OLED QR in provisioning mode scans to `http://192.168.4.1` without display code
   depending on WiFi.

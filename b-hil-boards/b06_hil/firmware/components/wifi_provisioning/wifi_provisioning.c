@@ -29,6 +29,7 @@ static const char *TAG = "wifi_prov";
 #define CONNECT_PER_ATTEMPT_TIMEOUT_MS 12000U
 #define CONNECT_ALERT_PHASE_MS 15000U
 #define CONNECT_BOOT_SETTLE_MS 1000U
+#define FACTORY_RESET_CONNECT_POLL_MS 100U
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_AP_STARTED_BIT BIT1
@@ -59,6 +60,7 @@ static uint8_t s_connect_attempt = 0;
 static int s_last_disconnect_reason = 0;
 static wifi_link_status_t s_link_status = WIFI_LINK_STATUS_UNPROVISIONED;
 static TaskHandle_t s_runtime_reconnect_task = NULL;
+static volatile bool s_factory_reset_abort = false;
 
 static const uint32_t s_connect_backoff_within_round_ms[CONNECT_ROUND_MAX_ATTEMPTS] = {
     0U, 1000U, 3000U, 5000U, 8000U,
@@ -70,6 +72,36 @@ static bool connect_cycle_run_round(const wifi_credentials_t *credentials,
                                     wifi_prov_sta_source_t source);
 static void connect_cycle_run_forever(const wifi_credentials_t *credentials,
                                       wifi_prov_sta_source_t source);
+static bool factory_reset_should_abort(void);
+static bool delay_interruptible_ms(uint32_t ms);
+
+static bool factory_reset_should_abort(void)
+{
+    if (s_factory_reset_abort) {
+        return true;
+    }
+
+    wifi_credentials_t creds = {0};
+    return !wifi_credentials_load(&creds);
+}
+
+static bool delay_interruptible_ms(uint32_t ms)
+{
+    uint32_t elapsed_ms = 0U;
+    while (elapsed_ms < ms) {
+        if (factory_reset_should_abort() || s_portal_active) {
+            return false;
+        }
+
+        const uint32_t step_ms = (ms - elapsed_ms) > FACTORY_RESET_CONNECT_POLL_MS
+                                     ? FACTORY_RESET_CONNECT_POLL_MS
+                                     : (ms - elapsed_ms);
+        vTaskDelay(pdMS_TO_TICKS(step_ms));
+        elapsed_ms += step_ms;
+    }
+
+    return true;
+}
 
 static void set_link_status(wifi_link_status_t status)
 {
@@ -476,19 +508,35 @@ static esp_err_t run_sta_connect_attempt(uint8_t attempt, uint32_t timeout_ms,
         return err;
     }
 
-    const EventBits_t bits =
-        xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_STA_DISCONNECTED_BIT,
-                            pdTRUE, pdFALSE, pdMS_TO_TICKS(timeout_ms));
+    uint32_t elapsed_ms = 0U;
+    while (elapsed_ms < timeout_ms) {
+        const uint32_t wait_ms = (timeout_ms - elapsed_ms) > FACTORY_RESET_CONNECT_POLL_MS
+                                     ? FACTORY_RESET_CONNECT_POLL_MS
+                                     : (timeout_ms - elapsed_ms);
+        const EventBits_t bits =
+            xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_STA_DISCONNECTED_BIT,
+                                pdTRUE, pdFALSE, pdMS_TO_TICKS(wait_ms));
+        elapsed_ms += wait_ms;
+
+        if ((bits & WIFI_CONNECTED_BIT) != 0U) {
+            s_connect_attempt = 0;
+            s_pending_sta_source = WIFI_PROV_STA_SOURCE_NONE;
+            return ESP_OK;
+        }
+        if ((bits & WIFI_STA_DISCONNECTED_BIT) != 0U) {
+            s_connect_attempt = 0;
+            s_pending_sta_source = WIFI_PROV_STA_SOURCE_NONE;
+            return ESP_FAIL;
+        }
+        if (factory_reset_should_abort()) {
+            s_connect_attempt = 0;
+            s_pending_sta_source = WIFI_PROV_STA_SOURCE_NONE;
+            return ESP_FAIL;
+        }
+    }
 
     s_connect_attempt = 0;
     s_pending_sta_source = WIFI_PROV_STA_SOURCE_NONE;
-
-    if ((bits & WIFI_CONNECTED_BIT) != 0U) {
-        return ESP_OK;
-    }
-    if ((bits & WIFI_STA_DISCONNECTED_BIT) != 0U) {
-        return ESP_FAIL;
-    }
     return ESP_ERR_TIMEOUT;
 }
 
@@ -517,7 +565,7 @@ static bool connect_cycle_run_round(const wifi_credentials_t *credentials,
     ESP_LOGI(TAG, "connect cycle round start source=%s", sta_source_label(source));
 
     for (uint8_t attempt = 1U; attempt <= CONNECT_ROUND_MAX_ATTEMPTS; ++attempt) {
-        if (s_portal_active) {
+        if (s_portal_active || factory_reset_should_abort()) {
             return false;
         }
 
@@ -552,7 +600,9 @@ static bool connect_cycle_run_round(const wifi_credentials_t *credentials,
                  sta_source_label(source));
 
         if (attempt < CONNECT_ROUND_MAX_ATTEMPTS && backoff_ms > 0U) {
-            vTaskDelay(pdMS_TO_TICKS(backoff_ms));
+            if (!delay_interruptible_ms(backoff_ms)) {
+                return false;
+            }
         }
     }
 
@@ -561,7 +611,9 @@ static bool connect_cycle_run_round(const wifi_credentials_t *credentials,
                ESP_OK);
     ESP_LOGI(TAG, "connect cycle alert_phase_ms=%u source=%s", CONNECT_ALERT_PHASE_MS,
              sta_source_label(source));
-    vTaskDelay(pdMS_TO_TICKS(CONNECT_ALERT_PHASE_MS));
+    if (!delay_interruptible_ms(CONNECT_ALERT_PHASE_MS)) {
+        return false;
+    }
     return false;
 }
 
@@ -573,7 +625,7 @@ static void connect_cycle_run_forever(const wifi_credentials_t *credentials,
              CONNECT_ROUND_MAX_ATTEMPTS, CONNECT_PER_ATTEMPT_TIMEOUT_MS, CONNECT_ALERT_PHASE_MS);
 
     while (true) {
-        if (s_portal_active) {
+        if (s_portal_active || factory_reset_should_abort()) {
             return;
         }
 
@@ -977,6 +1029,40 @@ esp_err_t wifi_provisioning_connect_saved(const wifi_credentials_t *credentials)
 
     connect_cycle_run_forever(credentials, WIFI_PROV_STA_SOURCE_SAVED);
     return ESP_OK;
+}
+
+esp_err_t wifi_provisioning_factory_reset_to_portal(void)
+{
+    ESP_LOGI(TAG, "factory reset abort connect cycle");
+
+    s_factory_reset_abort = true;
+
+    if (s_runtime_reconnect_task != NULL) {
+        vTaskDelete(s_runtime_reconnect_task);
+        s_runtime_reconnect_task = NULL;
+    }
+
+    s_pending_sta_source = WIFI_PROV_STA_SOURCE_NONE;
+    s_connect_attempt = 0;
+    s_sta_ipv4[0] = '\0';
+    s_last_disconnect_reason = 0;
+
+    ESP_LOGI(TAG, "factory reset stopping wifi");
+
+    (void)esp_wifi_disconnect();
+
+    if (s_httpd != NULL) {
+        httpd_stop(s_httpd);
+        s_httpd = NULL;
+    }
+
+    if (s_wifi_stack_ready) {
+        (void)esp_wifi_stop();
+    }
+
+    s_factory_reset_abort = false;
+
+    return wifi_provisioning_start_ap_portal();
 }
 
 esp_err_t wifi_provisioning_stop(void)

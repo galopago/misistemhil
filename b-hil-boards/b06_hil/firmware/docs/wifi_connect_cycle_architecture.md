@@ -35,7 +35,9 @@ loss** (`runtime_reconnect_task` path).
 | Round of 5 attempts failed | `WIFI` / `CONNECTING` (no HOLD RESET) | Fast blink 15 s |
 | After 15 s alert | New round; same OLED | Slow blink |
 | STA has IP | `WIFI OK` + IP + MAC | OFF |
-| Factory reset GPIO7 2 s | Erase creds; portal | Solid ON |
+| Factory reset GPIO7 10 s | Erase creds; portal | Solid ON |
+
+See `docs/wifi_factory_reset_architecture.md` for boot and runtime erase behavior.
 
 Cross-cutting rules:
 

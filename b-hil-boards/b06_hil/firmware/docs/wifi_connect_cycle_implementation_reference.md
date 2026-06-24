@@ -119,6 +119,9 @@ Returns from the function (stops cycling) when:
 2. `s_portal_active` is true at loop head or inside round.
 3. `wifi_credentials_load` fails (credentials erased, e.g. factory reset).
 
+Factory reset (GPIO7 hold 10 s): see
+[`wifi_factory_reset_implementation_reference.md`](wifi_factory_reset_implementation_reference.md).
+
 Otherwise loops unbounded (round → alert → round).
 
 ## `connect_cycle_run_round` behavior

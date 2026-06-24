@@ -125,9 +125,10 @@ flowchart TD
   board-owned configuration; `wifi_provisioning` must not hard-code `06`.
 - Normal NVS is accepted for v1 WiFi credentials. Do not claim the stored password
   is encrypted unless a future security handoff changes the storage profile.
-- `GPIO7` active-low factory reset is the only v1 recovery path from saved but
-  failing WiFi credentials. Web reset, serial reset, automatic credential erase,
-  and automatic AP fallback after boot failure are out of scope.
+- `GPIO7` active-low factory reset erases WiFi credentials after a **10000 ms (10 s)**
+  continuous hold, at **boot and runtime** (`docs/wifi_factory_reset_architecture.md`).
+  Web reset, serial reset, automatic credential erase, and automatic AP fallback
+  after connect failure are out of scope.
 - WiFi provisioning may request QR/status screens only through `app_core` display
   APIs after receiving neutral provisioning events. Display code must not include
   WiFi, HTTP, or NVS credential-storage headers, and `wifi_provisioning` must not

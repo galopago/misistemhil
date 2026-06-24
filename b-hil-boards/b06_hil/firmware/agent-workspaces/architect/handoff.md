@@ -34,6 +34,7 @@ Active handoffs:
 - `ERROR_LED_RUNTIME_LINK_STATUS`
 - `WIFI_RUNTIME_RECONNECT`
 - `WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2`
+- `WIFI_FACTORY_RESET_RUNTIME`
 
 Pending architect review: none.
 
@@ -708,6 +709,67 @@ Open questions:
   - None.
 ```
 
+## WIFI_FACTORY_RESET_RUNTIME
+
+```text
+Role boundary check:
+  Architect-owned. Firmware implementation and validation belong to implementer/tester.
+ID: WIFI_FACTORY_RESET_RUNTIME
+Source:
+  - Operator request: erase WiFi credentials when pressing the factory reset switch
+    (GPIO7), including while the device is running (not only at cold boot).
+  - Operator refinement: hold duration 10000 ms (10 s) to prevent accidental erase.
+  - Gap: boot-only hold in app_core_wifi_start(); connect cycle v2 blocks without
+    runtime recovery path.
+Objective:
+  Unified factory reset contract: hold GPIO7 active-low 10000 ms (10 s) erases wifi_prov
+  NVS and returns to provisioning portal at boot and runtime.
+Normative spec:
+  - docs/wifi_factory_reset_architecture.md (primary)
+  - docs/wifi_factory_reset_implementation_reference.md (as-built, Run 021 validated)
+Related:
+  - docs/wifi_provisioning_architecture.md (NVS, portal)
+  - docs/wifi_connect_cycle_architecture.md (abort cycle on erase)
+  - docs/esp32_c3_supermini_connections.md (GPIO7)
+Product rules:
+  - Hold >= 10000 ms (10 s) continuous: erase + portal; LED UNPROVISIONED (solid ON)
+  - Release before 10000 ms: no erase
+  - Soft transition (no esp_restart on success path)
+  - Abort connect cycle within 500 ms of hold confirmed
+Boot (retain + refactor):
+  - Existing blocking check in app_core_wifi_start before wifi_provisioning_init
+  - Share hold timing helpers with runtime monitor
+Runtime (new):
+  - FreeRTOS task wifi_fr_mon (stack 3072, priority 6) polls GPIO7
+  - On valid hold: wifi_credentials_erase() then
+    wifi_provisioning_factory_reset_to_portal()
+wifi_provisioning_factory_reset_to_portal() (new API):
+  - Set abort flag; cancel wifi_rt_rc; disconnect/stop WiFi; start_ap_portal path
+  - run_sta_connect_attempt must poll abort/credentials every <= 100 ms
+Status:
+  - **Validated by operator** (Run 021, Entry 024): runtime reset from connect cycle,
+    portal idempotent 2x, reprovision vitriolina.
+  - Deferred (recommended follow-up): boot hold 10s, boot short-press, reset from
+    stable WIFI OK only, isolated wifi_rt_rc + reset.
+Authorized files (implementer):
+  - components/app_core/app_core_wifi.c
+  - components/wifi_provisioning/include/wifi_provisioning.h
+  - components/wifi_provisioning/wifi_provisioning.c
+Non-goals:
+  - Tap-without-hold erase; web reset; esp_restart as primary path
+Acceptance criteria:
+  1. Boot hold 10 s: erase + portal (regression; updates legacy 2 s boot code).
+  2. Runtime from CONNECTED: hold 10 s -> portal within 500 ms abort budget.
+  3. Runtime from connect cycle (AP down): hold 10 s -> portal; cycle stops.
+  4. Short press never erases.
+  5. Serial: factory reset requested (runtime) + portal ready.
+Validation plan:
+  - Tester: provision, connect, runtime reset without power cycle; reprovision new SSID.
+  - **Done:** Run 021 PASS operator-critical path; see implementation reference matrix.
+Open questions:
+  - None.
+```
+
 ## WIFI_PROVISIONING_PORTAL_REACHABILITY
 
 ```text
@@ -1095,7 +1157,7 @@ Detailed behavior:
     and HTTP active.
   - Saved credential failure at boot: do not erase, do not reopen AP, remain
     disconnected until factory reset.
-  - Factory reset: GPIO7 active-low continuously for at least 2000 ms during boot
+  - Factory reset: GPIO7 active-low continuously for at least 10000 ms (10 s) during boot
     erases NVS namespace `wifi_prov` and enters provisioning AP mode.
   - Provisioning AP QR payload is exactly `http://192.168.4.1`, routed through
     a neutral provisioning event that app_core maps to app_core_display_show_qr_setup.
@@ -1117,7 +1179,7 @@ Acceptance criteria:
   - Saved credentials are used on reboot without AP.
   - Saved credential failure at boot leaves the device disconnected until factory
     reset.
-  - GPIO7 active-low for 2000 ms erases credentials and restarts provisioning.
+  - GPIO7 active-low for 10000 ms (10 s) erases credentials and restarts provisioning.
   - Static audits show display code excludes WiFi/network/provisioning headers
     and wifi_provisioning excludes app_core.h, display_controller.h, and display
     headers.

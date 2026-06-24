@@ -1,8 +1,8 @@
 # Tester Host Procedures
 
 Operational commands for WiFi provisioning validation on `b06_hil` (ESP32-C3).
-Use these when the firmware path under test is not yet available (for example,
-GPIO7 factory reset not implemented).
+Factory reset at runtime is implemented; see `docs/wifi_factory_reset_implementation_reference.md`.
+Use host NVS erase below when GPIO7 reset is not the test focus.
 
 ## Prerequisites
 
@@ -18,7 +18,8 @@ GPIO7 factory reset not implemented).
 - Start a **fresh provisioning** run after a previous POST saved credentials.
 - Recover from **saved STA boot** (device no longer opens provisioning AP
   `HIL-06-<MAC4>`).
-- **GPIO7 factory reset** is not implemented or not exercised in the current run.
+- **GPIO7 factory reset** at runtime: hold ≥ 10 s (Run 021 validated). Boot hold and
+  short-press negative tests are recommended follow-up.
 - Re-test POST from a clean NVS state without reflashing application firmware.
 
 ### What it erases
@@ -95,7 +96,7 @@ Do not dump or log NVS contents before erase (contains WiFi credentials).
 | Method | Notes |
 |--------|--------|
 | `idf.py erase-flash` | Erases entire flash; requires full reflash. Use only when intentional. |
-| GPIO7 hold ≥ 2000 ms at boot | Normative factory reset per architecture; use when implemented. |
+| GPIO7 hold ≥ 10 s at boot or runtime | Normative factory reset per `docs/wifi_factory_reset_architecture.md`. Runtime **validated Run 021**; boot hold deferred. |
 | Reflash only | Does **not** clear NVS unless flash image or erase step includes NVS. |
 
 ## Inject invalid WiFi credentials (saved-boot lock test)

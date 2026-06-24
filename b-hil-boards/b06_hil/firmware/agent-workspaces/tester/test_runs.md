@@ -490,6 +490,48 @@ Conclusion:
   See feedback.md Entry 007.
 ```
 
+### Run 021 — WIFI_FACTORY_RESET_RUNTIME
+
+```text
+Date: 2026-06-23
+Firmware: commit 0aeb6a541928167223fc95bb2e1952003c318eeb-dirty
+Handoff: WIFI_FACTORY_RESET_RUNTIME (docs/wifi_factory_reset_architecture.md)
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini on /dev/ttyACM0, GPIO7 factory reset (active-low)
+Commands:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  Static audit FACTORY_RESET_HOLD_MS=10000, wifi_fr_mon, factory_reset_to_portal
+  Phase A: 70s serial portal mode (operator hold GPIO7) -> run021_factory_reset.txt
+  Phase B: fake NVS inject + connect cycle + 70s serial (no reset press) -> run021_cycle_*.txt
+Result:
+  Build: PASS (0xde220)
+  Flash: PASS
+  FACTORY_RESET_HOLD_MS 10000: PASS (code)
+  wifi_provisioning_factory_reset_to_portal API + abort flag: PASS (code)
+  wifi_fr_mon monitor task: PASS (code + binary strings)
+  Phase A runtime reset from portal (idempotent 2x): PASS
+    factory reset requested (runtime)
+    factory reset abort connect cycle / stopping wifi
+    factory reset complete portal_active=true
+    provisioning portal ready (after each reset)
+  Phase B connect cycle + runtime reset: PASS (operator session, factory_reset_user_test.txt)
+    abort connect cycle during fake-creds cycle; portal restored
+  Runtime reset from portal (idempotent): PASS (serial Phase A + operator session)
+  Portal QR + setup OLED after reset: PASS (human Entry 024)
+  Reprovision vitriolina after reset: PASS (human Entry 024)
+  Boot hold >=10s at cold boot: NOT EXERCISED
+  Boot short press <10s no erase: NOT EXERCISED
+  Runtime reset from WIFI OK while connected only: NOT EXERCISED (reset from cycle/portal)
+Logs (operator connect-cycle reset):
+  W app_core_wifi: factory reset requested (runtime)
+  I wifi_prov: factory reset abort connect cycle
+  I app_core_wifi: factory reset complete portal_active=true
+Conclusion:
+  PASS for WIFI_FACTORY_RESET_RUNTIME operator-critical path: GPIO7 10s erases NVS,
+  aborts connect cycle, portal + QR OK, reprovision vitriolina OK (Entries 024).
+  Deferred: boot-hold, short-press negative, reset-only-from-stable-WIFI-OK screen.
+```
+
 ### Run 020 — WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2
 
 ```text
