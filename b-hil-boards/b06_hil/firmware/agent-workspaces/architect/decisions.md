@@ -1107,3 +1107,182 @@ Validation expectations:
 Open questions:
   - None.
 ```
+
+## 2026-06-23 — Error LED WiFi Link Status
+
+```text
+Date: 2026-06-23
+Decision: Map WiFi product link state to GPIO8 error LED via wifi_link_status_t on
+  every provisioning event, error_led component, and app_core_wifi adapter.
+Context: Operators need WiFi status without reading OLED. Portal vs saved-connect
+  vs connected vs locked-fail need distinct patterns. Solid ON only on saved-credentials
+  connect path (not portal SUBMITTED_CONNECTING).
+Alternatives considered:
+  - Per-event LED mapping in app_core_wifi: rejected (fragile).
+  - wifi_provisioning drives GPIO: rejected (coupling).
+  - Polling portal_active from LED task: rejected (races).
+Implementation contract:
+  - wifi_link_status_t: UNPROVISIONED, CONNECTING, CONNECTED, DISCONNECTED.
+  - error_led patterns: SLOW_BLINK 500/500ms, ON, OFF, FAST_BLINK 125/125ms.
+  - app_core_wifi maps status to pattern; boot gap before first callback.
+  - s_link_status single source of truth in wifi_provisioning.
+Expected behavior:
+  - No creds slow blink; saved connect solid ON; OK off; lock fast blink.
+Non-goals:
+  - STA_LOST_IP runtime, INA219 LED, portal connect solid ON.
+Consequences:
+  - New error_led component; wifi_prov_event_info_t gains link_status.
+Affected files:
+  - docs/error_led_wifi_link_architecture.md
+  - docs/wifi_provisioning_architecture.md
+  - agent-workspaces/architect/handoff.md (ERROR_LED_WIFI_LINK_STATUS)
+  - components/error_led/, wifi_provisioning, app_core (implementer)
+Validation expectations:
+  - Tester visual LED per boot phase; serial log link_status on events.
+Open questions:
+  - None.
+```
+
+## 2026-06-23 — Error LED Runtime Link Status
+
+```text
+Date: 2026-06-23
+Decision: Extend WiFi link_status updates to runtime with WIFI_PROV_EVENT_LINK_STATUS_CHANGED
+  (LED-only event); keep existing wifi_link_status_t → error_led mapping unchanged.
+Context: After CONNECTED, STA disconnect/LOST_IP left LED off because s_link_status was
+  stale and no callback reached app_core_wifi. Operator requested LED-only fix aligned
+  with prevailing link_status rules (same enum semantics as power-on), not WiFi retry design.
+Alternatives considered:
+  - Reemit SAVED_CONNECTING/SAVED_SUCCESS: rejected (changes OLED).
+  - app_core polling: rejected (module boundary).
+  - Direct GPIO from wifi_provisioning: rejected (coupling).
+Implementation contract:
+  - publish_link_status on enum change via LINK_STATUS_CHANGED.
+  - Runtime hooks on STA_DISCONNECTED, STA_LOST_IP, STA_GOT_IP (pending source NONE).
+  - app_core_wifi: empty case for LINK_STATUS_CHANGED; apply_wifi_link_status_led unchanged.
+  - CONNECTING vs DISCONNECTED at runtime uses existing pending-attempt / locked semantics.
+Expected behavior:
+  - Link loss after connect: LED leaves OFF state per link_status.
+  - Link restore: LED off; OLED unchanged on LINK_STATUS_CHANGED.
+Non-goals:
+  - WiFi reconnect policy, OLED on link loss, error_led timing changes.
+Consequences:
+  - wifi_prov_event_t gains LINK_STATUS_CHANGED; runtime rows in LED transition table.
+Affected files:
+  - docs/error_led_runtime_link_architecture.md (new)
+  - docs/error_led_wifi_link_architecture.md
+  - docs/wifi_provisioning_architecture.md
+  - agent-workspaces/architect/handoff.md (ERROR_LED_RUNTIME_LINK_STATUS)
+  - components/wifi_provisioning/, app_core_wifi.c (implementer)
+Validation expectations:
+  - Tester: AP outage with device connected; LED reflects loss; OLED static.
+Open questions:
+  - None.
+```
+
+## 2026-06-23 — WiFi Runtime Reconnect
+
+```text
+Date: 2026-06-23
+Decision: Unbounded STA reconnect with capped exponential backoff after runtime link
+  loss when NVS credentials are valid; never boot-lock from runtime loss alone.
+Context: ERROR_LED_RUNTIME_LINK_STATUS (layer 1) detects loss and may show FAST blink
+  but does not reconnect; AP recovery may require reboot. Operator chose infinite
+  retry at runtime vs mirroring boot 5-attempt lock.
+Alternatives considered:
+  - Mirror boot (5 attempts then SAVED_FAILURE_LOCKED): rejected for runtime.
+  - LED-only / no reconnect: rejected; product needs AP outage recovery.
+  - Reuse SAVED_CONNECTING/SAVED_SUCCESS events: rejected (tester/log confusion).
+  - esp_wifi_set_auto_connect only: rejected (opaque, hard to test, weak OLED/LED).
+Implementation contract:
+  - runtime_reconnect_task; run_sta_connect_attempt shared with connect_saved.
+  - Events RUNTIME_RECONNECTING, RUNTIME_RESTORED; STA source=runtime in logs.
+  - link_status CONNECTING for full episode (attempt + backoff); LED solid ON.
+  - backoff_ms cap 30000; per_attempt_timeout_ms 12000.
+  - Must not set s_locked_disconnected or s_saved_policy_exhausted from runtime.
+Expected behavior:
+  - Transient AP outage recovers without reboot; OLED CONNECTING then WIFI OK.
+  - Indefinite outage: LED ON reconnecting, not HOLD RESET.
+  - Boot bad creds: unchanged 5-attempt lock.
+Non-goals:
+  - Portal reopen, credential erase on runtime fail, change boot policy.
+Consequences:
+  - docs/wifi_runtime_reconnect_architecture.md; wifi_prov_event_t +2 events.
+Affected files:
+  - docs/wifi_runtime_reconnect_architecture.md (new)
+  - docs/wifi_provisioning_architecture.md
+  - docs/error_led_runtime_link_architecture.md
+  - docs/error_led_wifi_link_architecture.md
+  - agent-workspaces/architect/handoff.md (WIFI_RUNTIME_RECONNECT)
+  - components/wifi_provisioning/, app_core_wifi.c (implementer pending)
+Validation expectations:
+  - Tester: AP off/on while connected; long outage; boot-lock regression.
+Open questions:
+  - 500 ms LOST_IP-only debounce if false starts observed.
+```
+
+## 2026-06-23 — WiFi Connect Cycle and Error LED v2
+
+```text
+Date: 2026-06-23
+Decision: Replanned error LED and connect policy when NVS credentials exist: solid ON
+  without creds; slow blink while connecting; fast 15 s after each 5-attempt round
+  failure; repeat indefinitely; never SAVED_FAILURE_LOCKED or HOLD RESET OLED.
+Context: Operator rejected terminal boot lock and HOLD RESET for AP-down scenarios.
+  Prior v1 inverted UNPROVISIONED/CONNECTING LED mapping and locked after boot.
+  Prior WIFI_RUNTIME_RECONNECT kept boot lock separate from runtime.
+Alternatives considered:
+  - Keep boot lock, runtime infinite: rejected (operator wants one contract).
+  - v1 LED mapping: rejected.
+Implementation contract:
+  - wifi_link_status_t adds CONNECTING_ALERT; deprecate DISCONNECTED on creds path.
+  - Events CONNECT_CYCLE_ACTIVE, CONNECT_ALERT_PHASE, CONNECT_RESTORED.
+  - Round=5 attempts, alert=15s fast LED, unbounded cycle; boot=runtime same engine.
+  - LED: UNPROVISIONED=ON, CONNECTING=SLOW, CONNECTING_ALERT=FAST, CONNECTED=OFF.
+Expected behavior:
+  - AP outage: slow → fast 15s → slow cycle; OLED stays CONNECTING; no HOLD RESET.
+  - Success: LED off; WIFI OK screen.
+  - No creds: LED solid ON.
+Non-goals:
+  - Portal reopen on failure; credential erase on network failure.
+Consequences:
+  - Supersedes ERROR_LED_WIFI_LINK_STATUS, ERROR_LED_RUNTIME_LINK_STATUS,
+    WIFI_RUNTIME_RECONNECT for policy/LED.
+  - docs/wifi_connect_cycle_architecture.md, error_led_connect_cycle_architecture.md
+Affected files:
+  - docs/wifi_connect_cycle_architecture.md (new)
+  - docs/error_led_connect_cycle_architecture.md (new)
+  - docs/wifi_provisioning_architecture.md, superseded LED/reconnect docs
+  - agent-workspaces/architect/handoff.md (WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2)
+  - components/wifi_provisioning/, app_core_wifi.c (implemented; operator validated 2026-06-23)
+Validation expectations:
+  - Tester: no HOLD RESET with creds; LED phases match table; AP recovery without reboot.
+  - **Operator validated 2026-06-23.** As-built doc:
+    docs/wifi_connect_cycle_implementation_reference.md (boot blocks caller task;
+    runtime uses wifi_rt_rc; logs source=boot not saved).
+Open questions:
+  - None.
+```
+
+---
+
+## As-built documentation (2026-06-23)
+
+```text
+Date: 2026-06-23
+Decision: Publish implementation reference for validated connect cycle v2.
+Context: Operator confirmed firmware behavior matches v2 policy. Next implementer/LLM
+  must reproduce without chat history.
+Record: docs/wifi_connect_cycle_implementation_reference.md
+Key as-built facts:
+  - Motor: connect_cycle_run_forever → connect_cycle_run_round → run_sta_connect_attempt
+  - Boot: connect_saved blocks same task as app_core_wifi_start (CONNECT_BOOT_SETTLE_MS=1000)
+  - Runtime: handle_runtime_link_loss → xTaskCreate(wifi_rt_rc) → same motor
+  - Events emitted: CONNECT_CYCLE_ACTIVE, CONNECT_ALERT_PHASE, CONNECT_RESTORED only (cycle)
+  - Not emitted: SAVED_*, RUNTIME_RECONNECTING/RESTORED, SAVED_FAILURE_LOCKED
+  - locked_disconnected() always false; LED default → ON
+Affected files:
+  - docs/wifi_connect_cycle_implementation_reference.md (new)
+  - docs/wifi_connect_cycle_architecture.md, error_led_connect_cycle_architecture.md
+  - docs/wifi_provisioning_architecture.md, agent handoffs
+```

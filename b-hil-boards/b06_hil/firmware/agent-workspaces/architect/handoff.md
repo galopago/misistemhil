@@ -30,6 +30,10 @@ Active handoffs:
 - `PRODUCT_BOOT_DISPLAY_AND_DYNAMIC_AP_SSID`
 - `OLED_PROVISIONING_SETUP_UX`
 - `OLED_WIFI_CONNECTED_STATUS`
+- `ERROR_LED_WIFI_LINK_STATUS`
+- `ERROR_LED_RUNTIME_LINK_STATUS`
+- `WIFI_RUNTIME_RECONNECT`
+- `WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2`
 
 Pending architect review: none.
 
@@ -417,6 +421,289 @@ Acceptance criteria:
 Validation plan:
   - Implementer: build + serial log with example IP/MAC.
   - Tester: fresh provision + saved reboot; photograph OLED; compare IP/MAC to router.
+Open questions:
+  - None.
+```
+
+## ERROR_LED_WIFI_LINK_STATUS
+
+```text
+Role boundary check:
+  Architect-owned product UX. Firmware code, build, flash, and validation belong
+  to implementer/tester.
+ID: ERROR_LED_WIFI_LINK_STATUS
+Source:
+  - Human request 2026-06-23: error LED reflects WiFi link state with slow blink
+    (no creds), solid ON (saved creds connecting), OFF (connected), fast blink
+    (saved creds but cannot connect).
+  - Operator clarification: solid ON only on saved-credentials connect path, not
+    portal SUBMITTED_CONNECTING.
+Objective:
+  Decouple WiFi state from GPIO via wifi_link_status_t on every provisioning
+  event, error_led component, and app_core_wifi adapter (mirror OLED pattern).
+Reason:
+  OLED is not always visible; operators need at-a-glance WiFi status on GPIO8.
+Authorized files (implementer only):
+  - components/error_led/ (new; header stub may exist — implementer completes)
+  - components/wifi_provisioning/include/wifi_provisioning.h
+  - components/wifi_provisioning/wifi_provisioning.c
+  - components/app_core/app_core.c
+  - components/app_core/include/app_core.h
+  - components/app_core/app_core_wifi.c
+  - components/app_core/CMakeLists.txt
+Normative specs:
+  - docs/error_led_wifi_link_architecture.md (primary)
+  - docs/wifi_provisioning_architecture.md — Error LED integration
+  - docs/architecture.md — error_led component reference
+Expected changes (implementer):
+  error_led:
+    - Complete component: init, set_pattern, esp_timer blink, GPIO8 active-low.
+    - SLOW 500/500 ms, FAST 125/125 ms, ON/OFF per spec.
+  wifi_provisioning.h:
+    - Add wifi_link_status_t enum and link_status to wifi_prov_event_info_t.
+  wifi_provisioning.c:
+    - static s_link_status; set on each transition per transition table in docs.
+    - emit_event always sets info.link_status = s_link_status.
+  app_core:
+    - error_led_init in app_core_start before WiFi.
+    - app_core_error_led_set_pattern facade.
+  app_core_wifi.c:
+    - apply_wifi_link_status_led(info->link_status) end of each event branch.
+    - Boot gap: UNPROVISIONED if !has_credentials else CONNECTING before prov start.
+LED mapping:
+  UNPROVISIONED -> SLOW_BLINK
+  CONNECTING    -> ON
+  CONNECTED     -> OFF
+  DISCONNECTED  -> FAST_BLINK
+Module boundaries:
+  - wifi_provisioning MUST NOT include error_led or app_core.
+  - error_led MUST NOT include WiFi headers.
+Non-goals:
+  - STA_LOST_IP runtime LED update, INA219/I2C LED patterns, portal connect solid ON.
+Acceptance criteria:
+  1. No creds: slow blink (portal + SUBMITTED_CONNECTING).
+  2. Saved boot: solid ON until success or SAVED_FAILURE_LOCKED.
+  3. WiFi OK: LED off.
+  4. Locked disconnect: fast blink.
+  5. Module boundary rules pass (no forbidden includes).
+Validation plan:
+  - Implementer: build log per phase.
+  - Tester: NVS erase, provision, reboot, forced AP outage for fast blink.
+Open questions:
+  - None.
+```
+
+## ERROR_LED_RUNTIME_LINK_STATUS
+
+```text
+Role boundary check:
+  Architect-owned LED contract extension. Firmware code, build, flash, and
+  validation belong to implementer/tester.
+ID: ERROR_LED_RUNTIME_LINK_STATUS
+Source:
+  - Human request 2026-06-23: LED must reflect prevailing link_status rules when
+    WiFi connection is lost at runtime (after CONNECTED). LED-only; no OLED or
+    WiFi retry policy changes.
+  - Operator clarification: LED follows what WiFi is doing, same as power-on with
+    saved credentials — without specifying reconnect philosophy in this handoff.
+Objective:
+  Keep s_link_status truthful after initial connect and notify app_core_wifi via
+  WIFI_PROV_EVENT_LINK_STATUS_CHANGED so apply_wifi_link_status_led runs without
+  changing OLED or the existing wifi_link_status_t → pattern table.
+Reason:
+  After SAVED_SUCCESS/SUBMITTED_SUCCESS, STA_DISCONNECTED and STA_LOST_IP do not
+  update s_link_status; LED stays OFF while link is down.
+Authorized files (implementer only):
+  - components/wifi_provisioning/include/wifi_provisioning.h
+  - components/wifi_provisioning/wifi_provisioning.c
+  - components/app_core/app_core_wifi.c
+Normative specs:
+  - docs/error_led_runtime_link_architecture.md (primary)
+  - docs/error_led_wifi_link_architecture.md — runtime transition rows
+  - docs/wifi_provisioning_architecture.md — Runtime link_status for LED
+Expected changes (implementer):
+  wifi_provisioning.h:
+    - WIFI_PROV_EVENT_LINK_STATUS_CHANGED after WIFI_PROV_EVENT_ERROR.
+  wifi_provisioning.c:
+    - publish_link_status() emits LINK_STATUS_CHANGED with current link_status.
+    - update_runtime_link_status() idempotent enum change + publish.
+    - handle_runtime_link_loss() when CONNECTED and portal inactive.
+    - runtime_link_status_after_loss(): CONNECTING if pending STA attempt,
+      DISCONNECTED if locked or no attempt (reuses existing semantics).
+    - Hooks: STA_DISCONNECTED, STA_LOST_IP, STA_GOT_IP when
+      s_pending_sta_source == NONE (not stale GOT_IP).
+  app_core_wifi.c:
+    - case WIFI_PROV_EVENT_LINK_STATUS_CHANGED: break (no OLED).
+    - apply_wifi_link_status_led unchanged at end of on_wifi_prov_event.
+LED mapping: unchanged (UNPROVISIONED=SLOW, CONNECTING=ON, CONNECTED=OFF,
+  DISCONNECTED=FAST).
+Module boundaries:
+  - wifi_provisioning MUST NOT include error_led or app_core.
+  - error_led MUST NOT change.
+Non-goals:
+  - WiFi reconnect policy, retry counts, backoff, portal reopen.
+  - OLED update on runtime link loss.
+  - Changes to error_led timing or adapter mapping table.
+Acceptance criteria:
+  1. Connected (LED off) → AP offline → LED not stuck off (FAST or ON per link_status).
+  2. AP restored → LED off.
+  3. Portal / no-creds slow blink unchanged.
+  4. SAVED_FAILURE_LOCKED fast blink unchanged.
+  5. LINK_STATUS_CHANGED does not alter OLED.
+  6. Build passes; no forbidden includes.
+Validation plan:
+  - Implementer: idf.py build; log link_status on LINK_STATUS_CHANGED.
+  - Tester: connect → kill AP → observe LED → restore AP → LED off; OLED unchanged.
+Open questions:
+  - None.
+```
+
+## WIFI_RUNTIME_RECONNECT
+
+```text
+Role boundary check:
+  Architect-owned reconnect policy and event contract. Firmware code, build,
+  flash, and validation belong to implementer/tester.
+ID: WIFI_RUNTIME_RECONNECT
+Source:
+  - Human request 2026-06-23: architecture for runtime WiFi loss with valid NVS
+    credentials after sustained CONNECTED operation.
+  - Operator decision: unbounded reconnect with capped backoff; never boot-lock
+    from runtime loss alone (boot lock remains 5-attempt saved boot only).
+  - Builds on ERROR_LED_RUNTIME_LINK_STATUS (layer 1: detect loss + LED).
+Objective:
+  After link loss at runtime, reconnect STA indefinitely until GOT_IP or factory
+  reset; emit RUNTIME_RECONNECTING/RUNTIME_RESTORED; OLED + link_status CONNECTING
+  during full reconnect episode (attempt + backoff).
+Reason:
+  Layer 1 sets DISCONNECTED/fast blink but does not call esp_wifi_connect; device
+  may not recover when AP returns. CONNECTING LED semantics unreachable in runtime.
+Normative specs:
+  - docs/wifi_runtime_reconnect_architecture.md (primary)
+  - docs/wifi_provisioning_architecture.md — Runtime Reconnect Contract
+  - docs/error_led_wifi_link_architecture.md — CONNECTING during reconnect episode
+Authorized files (implementer only):
+  - components/wifi_provisioning/include/wifi_provisioning.h
+  - components/wifi_provisioning/wifi_provisioning.c
+  - components/app_core/app_core_wifi.c
+Expected changes (implementer):
+  wifi_provisioning.h:
+    - WIFI_PROV_EVENT_RUNTIME_RECONNECTING, WIFI_PROV_EVENT_RUNTIME_RESTORED
+  wifi_provisioning.c:
+    - WIFI_PROV_STA_SOURCE_RUNTIME internal; run_sta_connect_attempt() shared helper
+    - runtime_reconnect_task: unbounded loop, backoff [1k..30k cap]
+    - start_runtime_reconnect_if_needed() from handle_runtime_link_loss()
+    - Dedupe task; guards: !portal, !locked, pending!=SAVED
+    - Never set s_locked_disconnected or s_saved_policy_exhausted from runtime path
+  app_core_wifi.c:
+    - RUNTIME_RECONNECTING → WIFI/CONNECTING two lines
+    - RUNTIME_RESTORED → show_wifi_connected_display()
+    - apply_wifi_link_status_led unchanged
+Reconnect policy:
+  per_attempt_timeout_ms=12000
+  backoff_ms=[1000,3000,5000,8000,12000,15000,20000,30000] then hold 30000
+  max_attempts=unbounded
+link_status during episode: CONNECTING (LED solid ON entire episode)
+Lock rule: runtime loss MUST NOT trigger SAVED_FAILURE_LOCKED
+Module boundaries:
+  - wifi_provisioning MUST NOT include error_led or display headers
+Non-goals:
+  - Change boot 5-attempt lock
+  - Open portal on runtime loss
+  - Erase credentials on runtime reconnect failure
+  - esp_wifi_set_auto_connect as sole mechanism
+Acceptance criteria:
+  1. Connected → AP off → LED ON; OLED CONNECTING.
+  2. AP on → IP restored; LED off; OLED WIFI OK + IP/MAC.
+  3. AP off long → LED ON; no HOLD RESET / boot lock.
+  4. Bad creds cold boot → SAVED_FAILURE_LOCKED unchanged.
+  5. Serial source=runtime attempt=N; no saved boot failed attempts=5 from runtime.
+Validation plan:
+  - Implementer: idf.py build; log runtime attempts/backoff.
+  - Tester: AP power cycle; long outage; boot-lock regression; LED/OLED photos.
+Open questions:
+  - 500 ms debounce before starting task if only LOST_IP (add if tester needs).
+```
+
+## WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2
+
+```text
+Role boundary check:
+  Architect-owned product replan. Firmware code, build, flash, and validation
+  belong to implementer/tester.
+ID: WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2
+Source:
+  - Operator request 2026-06-23: replan error LED sequence and eliminate terminal
+    failure / HOLD RESET when credentials exist but network is unavailable.
+  - Parameters: 5 failed attempts per round → 15 s fast LED → repeat indefinitely.
+Objective:
+  Unified connect cycle for boot and runtime; v2 LED mapping; no SAVED_FAILURE_LOCKED
+  emission; no OLED HOLD RESET.
+Supersedes:
+  - ERROR_LED_WIFI_LINK_STATUS (v1 LED table)
+  - ERROR_LED_RUNTIME_LINK_STATUS (layer 1 DISCONNECTED fast)
+  - WIFI_RUNTIME_RECONNECT (split boot/runtime policy)
+Normative specs:
+  - docs/wifi_connect_cycle_architecture.md (primary)
+  - docs/wifi_connect_cycle_implementation_reference.md (as-built, operator validated 2026-06-23)
+  - docs/error_led_connect_cycle_architecture.md (LED v2)
+  - docs/wifi_provisioning_architecture.md — Connect Cycle + Error LED v2
+Status:
+  - **Validated by operator** (2026-06-23): connect cycle + LED v2 behave as specified in test.
+LED mapping v2:
+  UNPROVISIONED (no NVS creds)     -> ON (solid)
+  CONNECTING (round active)        -> SLOW_BLINK
+  CONNECTING_ALERT (post-5-fail)   -> FAST_BLINK for 15 s
+  CONNECTED                          -> OFF
+Connect cycle:
+  CONNECT_ROUND_MAX_ATTEMPTS=5
+  CONNECT_PER_ATTEMPT_TIMEOUT_MS=12000
+  CONNECT_ALERT_PHASE_MS=15000
+  CONNECT_BACKOFF_WITHIN_ROUND_MS=[0,1000,3000,5000,8000]
+  Repeat unbounded until GOT_IP or factory reset
+Events v2:
+  WIFI_PROV_EVENT_CONNECT_CYCLE_ACTIVE   link_status CONNECTING
+  WIFI_PROV_EVENT_CONNECT_ALERT_PHASE    link_status CONNECTING_ALERT
+  WIFI_PROV_EVENT_CONNECT_RESTORED       link_status CONNECTED + IP/MAC
+Deprecated (do not emit v2):
+  WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED
+  Permanent WIFI_LINK_STATUS_DISCONNECTED on creds path
+OLED v2:
+  CONNECT_CYCLE_ACTIVE / CONNECT_ALERT_PHASE -> WIFI/CONNECTING
+  CONNECT_RESTORED -> WIFI OK + IP/MAC
+  Remove SAVED_FAILURE_LOCKED -> HOLD RESET branch
+wifi_link_status_t v2:
+  Add WIFI_LINK_STATUS_CONNECTING_ALERT
+  Deprecate DISCONNECTED for creds connect paths
+Authorized files (implementer only):
+  - components/wifi_provisioning/include/wifi_provisioning.h
+  - components/wifi_provisioning/wifi_provisioning.c
+  - components/app_core/app_core_wifi.c
+Expected changes (implementer):
+  wifi_provisioning.c:
+    - Unified connect_cycle_run(source boot|runtime) with round/alert loop
+    - Remove s_locked_disconnected / SAVED_FAILURE_LOCKED emission
+    - connect_saved and runtime_reconnect_task use same cycle engine
+  app_core_wifi.c:
+    - apply_wifi_link_status_led v2 table
+    - OLED handlers for CONNECT_CYCLE_* ; remove HOLD RESET case
+  wifi_provisioning.h:
+    - CONNECTING_ALERT enum; CONNECT_CYCLE_* events
+Non-goals:
+  - Open portal on connect failure
+  - Erase credentials on network failure
+  - Change error_led timing constants
+Acceptance criteria:
+  1. No creds: LED solid ON (not slow).
+  2. Creds connecting: slow blink (not solid ON).
+  3. After 5 fails in round: fast ~15 s then slow again; cycle repeats.
+  4. Never OLED HOLD RESET with creds in NVS.
+  5. Connected: LED off.
+  6. Boot and runtime use same cycle; serial connect cycle logs; no saved boot failed attempts=5.
+Validation plan:
+  - Implementer: idf.py build; log one full round + alert + second round.
+  - Tester: NVS erase; provision; AP down/up boot and runtime; no HOLD RESET photos.
+  - **Done:** operator confirmed v2 works; see implementation reference for as-built replay.
 Open questions:
   - None.
 ```

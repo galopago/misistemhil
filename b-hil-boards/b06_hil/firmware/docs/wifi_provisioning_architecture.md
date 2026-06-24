@@ -41,7 +41,11 @@ The v1 product profile is fixed:
 | Factory reset input | `GPIO7`, active-low, per `docs/esp32_c3_supermini_connections.md` |
 | Behavior after successful provisioning | Save credentials, show success, stop AP/HTTP, remain connected as STA |
 | Behavior after failed submitted credentials | Do not save; keep AP/HTTP active; show failure and retry form |
-| Behavior after saved credentials fail at boot | Do not reopen AP automatically; remain disconnected until factory reset |
+| Behavior with saved credentials, no STA IP (boot or runtime) | **v2:** Indefinite connect cycle: 5 attempts → 15 s alert fast LED → repeat; never lock; never HOLD RESET OLED |
+| Factory reset | Erase credentials; portal; LED solid ON |
+
+**v1 (obsolete):** boot lock after 5 failures (`SAVED_FAILURE_LOCKED`, HOLD RESET).
+See `docs/wifi_connect_cycle_architecture.md` for v2.
 
 ### Provisioning AP SSID format
 
@@ -149,8 +153,11 @@ Dependency rules:
   `DISPLAY_TEMPLATE_FULL_TWO_LINES`.
 - `wifi_provisioning` MUST NOT know the existence of
   `app_core_display_show_template` or `app_core_display_show_qr_setup`.
+- `wifi_provisioning` MUST NOT include `error_led.h` or call GPIO for the error
+  LED.
 - `wifi_provisioning` emits state and result events; `app_core` decides whether
-  those events produce OLED text, QR, logs, or no user-visible output.
+  those events produce OLED text, QR, error LED patterns, logs, or no user-visible
+  output.
 
 Normative event model:
 
@@ -165,7 +172,21 @@ typedef enum {
     WIFI_PROV_EVENT_SAVED_SUCCESS,
     WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED,
     WIFI_PROV_EVENT_ERROR,
+    WIFI_PROV_EVENT_LINK_STATUS_CHANGED,
+    WIFI_PROV_EVENT_RUNTIME_RECONNECTING,
+    WIFI_PROV_EVENT_RUNTIME_RESTORED,
+    WIFI_PROV_EVENT_CONNECT_CYCLE_ACTIVE,
+    WIFI_PROV_EVENT_CONNECT_ALERT_PHASE,
+    WIFI_PROV_EVENT_CONNECT_RESTORED,
 } wifi_prov_event_t;
+
+typedef enum {
+    WIFI_LINK_STATUS_UNPROVISIONED = 0,
+    WIFI_LINK_STATUS_CONNECTING,
+    WIFI_LINK_STATUS_CONNECTING_ALERT,
+    WIFI_LINK_STATUS_CONNECTED,
+    /* WIFI_LINK_STATUS_DISCONNECTED — deprecated v2 */
+} wifi_link_status_t;
 
 typedef struct {
     wifi_prov_event_t event;
@@ -173,6 +194,7 @@ typedef struct {
     const char *ssid;           /* optional; never password */
     const char *sta_ipv4;       /* STA IPv4; SUBMITTED/SAVED success only */
     const char *sta_mac;        /* STA MAC AA:BB:CC:DD:EE:FF; success only */
+    wifi_link_status_t link_status; /* product WiFi link state; every event */
     esp_err_t status;           /* ESP_OK or mapped failure */
 } wifi_prov_event_info_t;
 
@@ -215,8 +237,46 @@ Rules:
 - `app_core` MUST map `WIFI_PROV_EVENT_SUBMITTED_SUCCESS` and
   `WIFI_PROV_EVENT_SAVED_SUCCESS` to the connected OLED screen documented in
   **Display Integration → WiFi connected OLED screen**.
+- `link_status` field semantics (normative):
+  - Present on **every** event; copied from `wifi_provisioning` internal
+    `s_link_status` at emit time.
+  - See **Error LED integration** and `docs/error_led_wifi_link_architecture.md`
+    for the transition table.
+- `WIFI_PROV_EVENT_LINK_STATUS_CHANGED` semantics (normative):
+  - LED-only notification; `app_core` MUST NOT change OLED on this event.
+  - `setup_url`, `ssid`, `sta_ipv4`, `sta_mac` MUST be NULL; `status` MUST be
+    `ESP_OK`.
+  - Emitted when `s_link_status` changes at runtime after initial connect (see
+    **Runtime link_status for LED**).
+  - Full contract: `docs/error_led_runtime_link_architecture.md`.
+- `WIFI_PROV_EVENT_RUNTIME_RECONNECTING` semantics (normative):
+  - Emitted when `runtime_reconnect_task` starts after link loss with valid NVS
+    credentials.
+  - `link_status` MUST be `WIFI_LINK_STATUS_CONNECTING`.
+  - `ssid` MAY be the home network SSID; `sta_ipv4` and `sta_mac` MUST be NULL.
+  - Full contract: `docs/wifi_runtime_reconnect_architecture.md`.
+- `WIFI_PROV_EVENT_RUNTIME_RESTORED` semantics (normative):
+  - Emitted when runtime reconnect obtains STA IP.
+  - `link_status` MUST be `WIFI_LINK_STATUS_CONNECTED`.
+  - `sta_ipv4` and `sta_mac` MUST follow the same success rules as
+    `WIFI_PROV_EVENT_SAVED_SUCCESS`.
+  - Full contract: `docs/wifi_runtime_reconnect_architecture.md` (v1, superseded).
+- `WIFI_PROV_EVENT_CONNECT_CYCLE_ACTIVE` semantics (normative v2):
+  - Start of each connect round (boot or runtime).
+  - `link_status` MUST be `WIFI_LINK_STATUS_CONNECTING`.
+  - Full contract: `docs/wifi_connect_cycle_architecture.md`.
+- `WIFI_PROV_EVENT_CONNECT_ALERT_PHASE` semantics (normative v2):
+  - After 5 failed attempts in current round; 15 s fast LED phase.
+  - `link_status` MUST be `WIFI_LINK_STATUS_CONNECTING_ALERT`.
+  - OLED remains `WIFI` / `CONNECTING` (no HOLD RESET).
+- `WIFI_PROV_EVENT_CONNECT_RESTORED` semantics (normative v2):
+  - STA obtained IP during a round.
+  - `link_status` MUST be `WIFI_LINK_STATUS_CONNECTED`.
+  - `sta_ipv4` / `sta_mac` same rules as saved success events.
+- `WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED` (deprecated v2):
+  - MUST NOT be emitted. OLED HOLD RESET removed.
 - `wifi_provisioning` must remain reusable in a headless product that has no OLED
-  component at all.
+  or error LED component.
 
 ## Credential Model
 
@@ -818,10 +878,15 @@ Rules:
 
 ## Saved Boot Reliability Contract
 
-Run 013 proved that a single successful reboot is not enough. The same saved
-credentials connected on some cold boots and failed on others with
-`WIFI_REASON_AUTH_FAIL` reason `202` against a WPA3-SAE network. The saved boot
-path is therefore a reliability contract, not a single `esp_wifi_connect()` call.
+> **v2 as-built:** Saved boot uses the unified connect cycle engine
+> (`connect_cycle_run_forever` with source `SAVED`, logs as `source=boot`).
+> There is **no** terminal lock, **no** `SAVED_FAILURE_LOCKED`, and **no** OLED
+> HOLD RESET. See `docs/wifi_connect_cycle_architecture.md` and
+> **`docs/wifi_connect_cycle_implementation_reference.md`**.
+
+The sections below describe **v1 historical policy** (5 attempts → lock). STA
+configuration requirements (WPA2/WPA3-SAE, shared `apply_sta_config`) remain valid
+for v2; retry/lock semantics are superseded by the connect cycle contract.
 
 ### Product decision
 
@@ -862,7 +927,13 @@ Rules:
 wifi_prov: STA config auth_profile=wpa2_wpa3_personal pmf_capable=true pmf_required=false
 ```
 
-### Saved boot retry policy
+### Saved boot retry policy (v1 — obsolete lock semantics)
+
+**v2:** Replaced by connect cycle (`CONNECT_ROUND_MAX_ATTEMPTS=5`,
+`CONNECT_BOOT_SETTLE_MS=1000`, same backoff array, then 15 s alert and repeat).
+Do not emit `WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED`.
+
+Historical v1 requirement (obsolete):
 
 Saved boot MUST try more than once before entering
 `WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED`.
@@ -889,8 +960,9 @@ Rules:
 - Late `GOT_IP` events after all attempts are exhausted MUST be logged as stale and
   ignored.
 - Do not erase credentials and do not reopen provisioning AP after all saved boot
-  retries fail. The existing locked-disconnected / factory-reset recovery remains
-  the v1 behavior.
+  retries fail. **v1:** locked-disconnected / factory-reset recovery applied.
+  **v2:** cycle repeats indefinitely; `wifi_provisioning_locked_disconnected()`
+  always returns `false`.
 
 Required saved-boot logs:
 
@@ -934,6 +1006,107 @@ If any boot requires more than one attempt but eventually connects, the run MAY
 pass only if the logs show the retry recovered within the policy and the 10-boot
 sweep completes with no final locked failures.
 
+## WiFi Connect Cycle Contract (v2)
+
+Handoff: `WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2`. Full contract:
+`docs/wifi_connect_cycle_architecture.md`. **As-built reference:**
+`docs/wifi_connect_cycle_implementation_reference.md`. LED mapping:
+`docs/error_led_connect_cycle_architecture.md`.
+
+**Operator validated:** 2026-06-23.
+
+Boot and runtime use the **same** connect cycle when credentials exist in NVS:
+
+```text
+round: 5 attempts (12 s timeout each, intra-round backoff)
+alert: 15 s CONNECTING_ALERT (fast LED)
+repeat: unbounded until GOT_IP or factory reset
+```
+
+### Product rules (v2)
+
+- MUST NOT emit `SAVED_FAILURE_LOCKED` or show OLED HOLD RESET.
+- MUST NOT set `s_locked_disconnected` on credential paths (`locked_disconnected()`
+  API returns `false` in v2).
+- MUST NOT erase credentials or open portal due to connect failure.
+- Boot path blocks `app_core_wifi_start()` caller task until success or portal/creds exit.
+
+### Events and display (v2)
+
+Events **emitted** by `wifi_provisioning` on connect paths: `CONNECT_CYCLE_ACTIVE`,
+`CONNECT_ALERT_PHASE`, `CONNECT_RESTORED` (plus portal events as before).
+
+| Event | OLED |
+| --- | --- |
+| `CONNECT_CYCLE_ACTIVE` | `WIFI` / `CONNECTING` |
+| `CONNECT_ALERT_PHASE` | `WIFI` / `CONNECTING` |
+| `CONNECT_RESTORED` | WiFi connected screen (IP + MAC) |
+| `SAVED_FAILURE_LOCKED` | **deprecated — not emitted; handler is no-op** |
+
+### Required logs (v2)
+
+```text
+wifi_prov: connect cycle round start source=<boot|runtime>
+wifi_prov: connect cycle attempt <n>/5 start source=<boot|runtime>
+wifi_prov: connect cycle alert_phase_ms=15000 source=<boot|runtime>
+wifi_prov: connect cycle restored ip=<ipv4> source=<boot|runtime>
+```
+
+## Runtime Reconnect Contract (v1, superseded)
+
+Handoff: `WIFI_RUNTIME_RECONNECT`. Superseded by **WiFi Connect Cycle Contract (v2)**
+above. Retained for historical reference only.
+
+<details>
+<summary>v1 runtime reconnect (obsolete)</summary>
+
+After the device has connected with saved credentials and later loses STA link or
+IP at runtime, `wifi_provisioning` MUST reconnect indefinitely with capped backoff
+until `IP_EVENT_STA_GOT_IP` or factory reset.
+
+### Product rules
+
+- Runtime reconnect MUST NOT set `s_locked_disconnected` or
+  `s_saved_policy_exhausted`.
+- Runtime reconnect MUST NOT erase credentials or open the provisioning AP.
+- **v1 obsolete:** Saved boot policy (5 attempts → `SAVED_FAILURE_LOCKED`) — v2
+  uses the same connect cycle as runtime (unbounded rounds).
+- `link_status` MUST remain `CONNECTING` for the full reconnect episode (attempt
+  plus inter-attempt backoff) so LED stays solid ON per
+  `docs/error_led_wifi_link_architecture.md`.
+
+### Retry policy
+
+```text
+per_attempt_timeout_ms: 12000
+backoff_after_failure_ms: [1000, 3000, 5000, 8000, 12000, 15000, 20000, 30000]
+backoff_cap_ms: 30000 (hold forever after sequence end)
+max_attempts: unbounded until GOT_IP or factory reset
+```
+
+### Events and display
+
+- `WIFI_PROV_EVENT_RUNTIME_RECONNECTING` → OLED `WIFI` / `CONNECTING`.
+- `WIFI_PROV_EVENT_RUNTIME_RESTORED` → OLED WiFi connected screen (IP + MAC).
+- Do not reuse `SAVED_CONNECTING` / `SAVED_SUCCESS` for runtime paths.
+
+### Concurrency
+
+- At most one `runtime_reconnect_task`; dedupe triggers from `STA_DISCONNECTED`
+  and `STA_LOST_IP`.
+- Do not start runtime reconnect during portal activity, boot lock, or active
+  `connect_saved()` (`s_pending_sta_source == SAVED`).
+
+### Required logs
+
+```text
+wifi_prov: runtime reconnect attempt <n> start
+wifi_prov: STA got IP ip=<ipv4> source=runtime attempt=<n>
+wifi_prov: runtime reconnect restored ip=<ipv4>
+```
+
+</details>
+
 ### State rules
 
 `Start_open_AP_and_HTTP`:
@@ -949,14 +1122,12 @@ sweep completes with no final locked failures.
 `Connect_STA_with_saved_credentials`:
 
 - Use saved credentials without opening the provisioning AP.
-- Follow the Saved Boot Reliability Contract instead of a single connection
-  attempt.
-- Wait `1000 ms` after cold `esp_wifi_start()` before attempt 1.
-- Retry up to 5 saved-credential attempts with bounded backoff and per-attempt
-  timeout.
+- **v2:** Follow the WiFi Connect Cycle Contract (5 attempts per round, 15 s alert,
+  repeat until success). Do not enter locked failure or HOLD RESET OLED.
+- Wait `1000 ms` after cold `esp_wifi_start()` before round 1 attempt 1.
 - If connection succeeds, enter normal connected operation.
-- If connection fails, do not erase credentials and do not start provisioning AP.
-  The device remains disconnected until factory reset.
+- If connection fails within a round, enter alert phase and continue cycling.
+  Do not erase credentials and do not start provisioning AP.
 
 `Try_STA_connection_keep_AP`:
 
@@ -1314,7 +1485,10 @@ idempotent and intentional.
 | `WIFI_PROV_EVENT_SUBMITTED_SUCCESS` | Connected screen (4 lines: IP + MAC); see **WiFi connected OLED screen** |
 | `WIFI_PROV_EVENT_SUBMITTED_FAILURE` | `app_core_display_show_template(FULL_TWO_LINES, ["WIFI", "FAILED"], 2)` |
 | `WIFI_PROV_EVENT_SAVED_SUCCESS` | Connected screen (same as `SUBMITTED_SUCCESS`) |
-| `WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED` | `app_core_display_show_template(FULL_FOUR_LINES, ["WIFI", "FAILED", "HOLD", "RESET"], 4)` |
+| `WIFI_PROV_EVENT_CONNECT_CYCLE_ACTIVE` | `WIFI` / `CONNECTING` (v2) |
+| `WIFI_PROV_EVENT_CONNECT_ALERT_PHASE` | `WIFI` / `CONNECTING` (v2; no HOLD RESET) |
+| `WIFI_PROV_EVENT_CONNECT_RESTORED` | Connected screen (v2) |
+| `WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED` | **v2: deprecated — do not emit or display** |
 
 ### WiFi connected OLED screen
 
@@ -1438,6 +1612,41 @@ Rules:
 - The QR payload remains root-only `http://192.168.4.1`, matching
   `docs/qr_encoder_interface.md`.
 
+## Error LED integration
+
+Handoff: `WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2`. Full contract:
+`docs/error_led_connect_cycle_architecture.md`. **As-built adapter:**
+`docs/wifi_connect_cycle_implementation_reference.md` (LED section).
+
+`WIFI_LINK_STATUS_DISCONNECTED` remains in `wifi_provisioning.h` (deprecated v2) but
+**must not** be assigned on credential connect paths; LED `default` → ON if it
+arrives.
+
+`app_core_wifi` maps `info->link_status` to `app_core_error_led_set_pattern`:
+
+| `wifi_link_status_t` | Error LED pattern |
+| --- | --- |
+| `WIFI_LINK_STATUS_UNPROVISIONED` | Solid ON |
+| `WIFI_LINK_STATUS_CONNECTING` | Slow blink |
+| `WIFI_LINK_STATUS_CONNECTING_ALERT` | Fast blink |
+| `WIFI_LINK_STATUS_CONNECTED` | OFF |
+
+Rules:
+
+- `wifi_provisioning` updates `s_link_status` per connect cycle (see
+  `docs/wifi_connect_cycle_architecture.md`).
+- `emit_event` MUST set `info.link_status = s_link_status`.
+- `app_core_wifi` MUST NOT derive LED state from `wifi_prov_event_t` alone.
+- Boot gap: before first callback, `app_core_wifi_start` sets `UNPROVISIONED`
+  (solid ON) if no credentials, else `CONNECTING` (slow blink).
+
+**v1 mapping** (superseded): `docs/error_led_wifi_link_architecture.md`.
+
+### Runtime link_status for LED (v1, superseded)
+
+See WiFi Connect Cycle Contract (v2). Layer-1 `LINK_STATUS_CHANGED` is optional
+when all cycle events carry `link_status`.
+
 ## Startup Order
 
 Canonical startup order:
@@ -1453,7 +1662,8 @@ Canonical startup order:
 8. If credentials are missing, start provisioning AP and HTTP portal.
 9. If credentials are present, connect STA without opening AP.
 10. app_core maps neutral provisioning events to display screens through
-    app_core_display_show_*.
+    app_core_display_show_* and to error LED patterns through
+    app_core_error_led_set_pattern (from info->link_status).
 11. Normal product services start only after WiFi state is resolved or explicitly
     allowed to run disconnected by a future handoff.
 ```
