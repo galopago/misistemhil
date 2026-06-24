@@ -28,6 +28,29 @@ static const char *TAG = "app_core_wifi";
 
 static bool s_wifi_started = false;
 
+static void apply_wifi_link_status_led(wifi_link_status_t status)
+{
+    error_led_pattern_t pattern;
+    switch (status) {
+    case WIFI_LINK_STATUS_UNPROVISIONED:
+        pattern = ERROR_LED_PATTERN_ON;
+        break;
+    case WIFI_LINK_STATUS_CONNECTING:
+        pattern = ERROR_LED_PATTERN_SLOW_BLINK;
+        break;
+    case WIFI_LINK_STATUS_CONNECTING_ALERT:
+        pattern = ERROR_LED_PATTERN_FAST_BLINK;
+        break;
+    case WIFI_LINK_STATUS_CONNECTED:
+        pattern = ERROR_LED_PATTERN_OFF;
+        break;
+    default:
+        pattern = ERROR_LED_PATTERN_ON;
+        break;
+    }
+    (void)app_core_error_led_set_pattern(pattern);
+}
+
 static void show_wifi_connected_display(const wifi_prov_event_info_t *info)
 {
     if (info == NULL || info->sta_ipv4 == NULL || info->sta_mac == NULL ||
@@ -126,28 +149,34 @@ static void on_wifi_prov_event(const wifi_prov_event_info_t *info, void *ctx)
         (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, lines, 2);
         break;
     }
-    case WIFI_PROV_EVENT_SAVED_CONNECTING: {
+    case WIFI_PROV_EVENT_SAVED_CONNECTING:
+    case WIFI_PROV_EVENT_RUNTIME_RECONNECTING:
+    case WIFI_PROV_EVENT_CONNECT_CYCLE_ACTIVE:
+    case WIFI_PROV_EVENT_CONNECT_ALERT_PHASE: {
         const char *lines[] = {"WIFI", "CONNECTING"};
         (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, lines, 2);
         break;
     }
     case WIFI_PROV_EVENT_SAVED_SUCCESS:
+    case WIFI_PROV_EVENT_RUNTIME_RESTORED:
+    case WIFI_PROV_EVENT_CONNECT_RESTORED:
         show_wifi_connected_display(info);
         break;
-    case WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED: {
-        const char *lines[] = {"WIFI", "FAILED", "HOLD", "RESET"};
-        (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_FOUR_LINES, lines, 4);
+    case WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED:
         break;
-    }
     case WIFI_PROV_EVENT_ERROR: {
         const char *line2 = info->setup_url == NULL ? "AP FAIL" : "WEB FAIL";
         const char *lines[] = {"WIFI", line2};
         (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, lines, 2);
         break;
     }
+    case WIFI_PROV_EVENT_LINK_STATUS_CHANGED:
+        break;
     default:
         break;
     }
+
+    apply_wifi_link_status_led(info->link_status);
 }
 
 esp_err_t app_core_wifi_start(void)
@@ -179,6 +208,12 @@ esp_err_t app_core_wifi_start(void)
 
     wifi_credentials_t credentials = {0};
     const bool has_credentials = !credentials_erased && wifi_credentials_load(&credentials);
+
+    if (!has_credentials) {
+        apply_wifi_link_status_led(WIFI_LINK_STATUS_UNPROVISIONED);
+    } else {
+        apply_wifi_link_status_led(WIFI_LINK_STATUS_CONNECTING);
+    }
 
     if (!has_credentials) {
         err = wifi_provisioning_start_ap_portal();

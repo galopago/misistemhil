@@ -16,6 +16,12 @@ Before starting any task in this file, run the **Role Boundary Check**:
 
 **Host procedures:** see `procedures.md` (NVS credential erase via `esptool`).
 
+Run 020: **PASS** — `WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2` (Entries 021–022); AP restore deferred.
+
+Run 019: **PARTIAL PASS** — `ERROR_LED_RUNTIME_LINK_STATUS` + `WIFI_RUNTIME_RECONNECT`; boot-lock regression PASS; AP outage blocked.
+
+Run 018: **PASS** — `ERROR_LED_WIFI_LINK_STATUS` (Entries 017–020).
+
 Run 017: **PASS** — `OLED_WIFI_CONNECTED_STATUS` (Entry 016).
 
 Run 016: **PASS** — `OLED_PROVISIONING_SETUP_UX` (Entry 015).
@@ -29,6 +35,76 @@ Run 012: **PARTIAL PASS** — superseded by Run 013 for POST UX.
 Run 011: **PARTIAL PASS** — GET / formulario OK; POST falló con 431 (512 bytes). Corregido en Run 012 config.
 
 Run 006: **PASS** completo para `DISPLAY_VISUAL_DEMO_PROTOCOL` (demo retired).
+
+## ERROR_LED_RUNTIME_LINK_STATUS + WIFI_RUNTIME_RECONNECT — Run 019
+
+```text
+ID: ERROR_LED_RUNTIME_LINK_STATUS, WIFI_RUNTIME_RECONNECT (Run 019)
+Source: agent-workspaces/implementer/handoff.md
+  docs/error_led_runtime_link_architecture.md
+  docs/wifi_runtime_reconnect_architecture.md
+NVS at test start: invalid injected creds (NONEXISTENT_AP_XYZ) from Run 018 Phase C
+Commands executed:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  Static audits (module boundaries, new events, runtime log strings)
+  Boot lock regression serial 38s -> /tmp/b06_hil_boot_log_run019_lock_regression.txt
+  Initial boot capture -> /tmp/b06_hil_boot_log_run019_initial.txt
+Hardware used:
+  ESP32-C3 SuperMini on /dev/ttyACM0, GPIO8 error LED, OLED @ 0x3C
+Result:
+  Build/flash 0xde060: PASS (matches implementer handoff)
+  wifi_provisioning no error_led/display includes: PASS
+  LINK_STATUS_CHANGED + RUNTIME_* events in header: PASS
+  app_core_wifi LINK_STATUS_CHANGED no OLED; RUNTIME OLED handlers: PASS (code review)
+  Runtime log strings in binary: PASS
+  Boot lock regression (bad saved creds, 5 attempts): PASS
+  No runtime reconnect logs during boot lock: PASS
+  AP power-cycle while connected: NOT EXERCISED (host on 192.168.1.x; device AP vitriolina 192.168.80.x)
+  Long outage / LED ON without HOLD RESET: NOT EXERCISED
+  RUNTIME_RESTORED serial path: NOT EXERCISED
+  ERROR_LED runtime loss/restore visual: NOT EXERCISED
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 019
+  /tmp/b06_hil_boot_log_run019_{initial,lock_regression}.txt
+Blocked follow-up (operator):
+  1. esptool erase_region 0x9000 0x6000 + re-provision vitriolina
+  2. Wait STA got IP source=saved
+  3. Power-cycle home AP 30s -> expect LED ON, OLED WIFI/CONNECTING, source=runtime logs
+  4. Restore AP -> expect RUNTIME_RESTORED, LED off, OLED WIFI OK
+Recommendation:
+  Accept build/static/boot-lock criteria. Defer runtime reconnect + runtime LED until
+  operator completes AP outage procedure or provides serial capture during outage.
+```
+
+## ERROR_LED_WIFI_LINK_STATUS — Run 018
+
+```text
+ID: ERROR_LED_WIFI_LINK_STATUS (Run 018)
+Source: agent-workspaces/implementer/handoff.md, docs/error_led_wifi_link_architecture.md
+Commands executed:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  Static audits (module boundaries, timing, init order)
+  Phase B: saved-credentials boot -> /tmp/b06_hil_boot_log_run018_phaseB_saved.txt
+  Phase A: NVS erase + portal boot -> /tmp/b06_hil_boot_log_run018_phaseA_fresh.txt
+  Phase C: injected bad NVS + lock capture -> /tmp/b06_hil_boot_log_run018_phaseC_locked.txt
+Hardware used:
+  ESP32-C3 SuperMini on /dev/ttyACM0, GPIO8 error LED (active-low)
+Result:
+  Build/flash 0xdd7d0: PASS
+  Module boundary audit: PASS
+  GPIO8 output init at boot: PASS
+  Fresh NVS portal (UNPROVISIONED / slow blink): PASS (serial + human Entry 017)
+  Saved boot solid ON while connecting (CONNECTING): PASS (serial + human Entry 018)
+  Saved boot off after connect (CONNECTED): PASS (serial + human Entry 019)
+  Locked failure fast blink (DISCONNECTED): PASS (serial + human Entry 020)
+  POST SUBMITTED_SUCCESS path: NOT EXERCISED (same CONNECTED → OFF mapping as SAVED_SUCCESS)
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 018
+  agent-workspaces/tester/feedback.md Entries 017–020
+  /tmp/b06_hil_boot_log_run018_phase{C,_retest}.txt
+Recommendation:
+  Accept ERROR_LED_WIFI_LINK_STATUS. All acceptance criteria 1–6 satisfied for v1 scope.
+```
 
 ## OLED_WIFI_CONNECTED_STATUS — Run 017
 

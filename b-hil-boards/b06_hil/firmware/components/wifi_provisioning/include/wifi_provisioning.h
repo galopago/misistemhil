@@ -9,6 +9,14 @@ extern "C" {
 #endif
 
 typedef enum {
+    WIFI_LINK_STATUS_UNPROVISIONED = 0,
+    WIFI_LINK_STATUS_CONNECTING,
+    WIFI_LINK_STATUS_CONNECTING_ALERT,
+    WIFI_LINK_STATUS_CONNECTED,
+    WIFI_LINK_STATUS_DISCONNECTED, /* deprecated v2; do not set on creds path */
+} wifi_link_status_t;
+
+typedef enum {
     WIFI_PROV_EVENT_AP_STARTED = 0,
     WIFI_PROV_EVENT_PORTAL_READY,
     WIFI_PROV_EVENT_SUBMITTED_CONNECTING,
@@ -18,6 +26,12 @@ typedef enum {
     WIFI_PROV_EVENT_SAVED_SUCCESS,
     WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED,
     WIFI_PROV_EVENT_ERROR,
+    WIFI_PROV_EVENT_LINK_STATUS_CHANGED,
+    WIFI_PROV_EVENT_RUNTIME_RECONNECTING,
+    WIFI_PROV_EVENT_RUNTIME_RESTORED,
+    WIFI_PROV_EVENT_CONNECT_CYCLE_ACTIVE,
+    WIFI_PROV_EVENT_CONNECT_ALERT_PHASE,
+    WIFI_PROV_EVENT_CONNECT_RESTORED,
 } wifi_prov_event_t;
 
 typedef struct {
@@ -27,6 +41,7 @@ typedef struct {
     const char *sta_ipv4;
     const char *sta_mac;
     esp_err_t status;
+    wifi_link_status_t link_status;
 } wifi_prov_event_info_t;
 
 typedef void (*wifi_prov_event_cb_t)(const wifi_prov_event_info_t *info, void *ctx);

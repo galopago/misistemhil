@@ -490,6 +490,146 @@ Conclusion:
   See feedback.md Entry 007.
 ```
 
+### Run 020 — WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2
+
+```text
+Date: 2026-06-23
+Firmware: commit 0aeb6a541928167223fc95bb2e1952003c318eeb-dirty
+Handoff: WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+NVS phases:
+  - Erased (operator request) -> portal provision vitriolina (human PASS Entry 021)
+  - Operator-authorized inject: NONEXISTENT_AP_XYZ / badpass12345
+Commands:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  Static audit LED v2 table, no SAVED_FAILURE_LOCKED emit, no HOLD RESET in bin
+  Phase A: NVS erase + portal boot -> phaseA_fresh.txt
+  Operator portal POST vitriolina (human)
+  Phase B: authorized fake NVS inject + serial 100s -> phaseB_cycle.txt
+Result:
+  Build: PASS (0xddc10)
+  Flash: PASS
+  LED v2 mapping ON/slow/fast/off: PASS (code review)
+  No boot lock / no HOLD RESET in firmware: PASS
+  Phase A fresh NVS portal (no connect cycle): PASS
+  Portal provision + LED solid ON no creds: PASS (human Entry 021)
+  Phase B fake creds connect cycle serial:
+    STA mode, policy log, 5 attempts, alert 15s, 2nd+ round: PASS
+    3 rounds / 15 attempts / 3 alerts in 100s capture: PASS
+    no saved boot failed attempts=5: PASS
+  OLED/LED slow -> fast 15s -> slow during outage: PASS (human Entry 022)
+  OLED stays CONNECTING, no HOLD RESET: PASS (human Entry 022)
+  AP restore -> CONNECT_RESTORED: NOT EXERCISED
+Logs (Phase B):
+  I (1642) wifi_prov: connect cycle policy round_attempts=5 ...
+  I (1642) wifi_prov: connect cycle round start source=boot
+  I (23212) wifi_prov: connect cycle alert_phase_ms=15000 source=boot
+  I (38222) wifi_prov: connect cycle round start source=boot
+Conclusion:
+  PASS for WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2 boot + outage cycle criteria (1–4, 6–7).
+  Portal + no-creds LED ON (Entry 021); fake-creds slow/fast infinite cycle (Entry 022).
+  AP restore (criterion 4) and factory reset (criterion 5) not exercised this run.
+  Device has fake NVS; erase + re-provision vitriolina to restore normal operation.
+```
+
+### Run 019 — ERROR_LED_RUNTIME_LINK_STATUS + WIFI_RUNTIME_RECONNECT
+
+```text
+Date: 2026-06-23
+Firmware: commit 0aeb6a541928167223fc95bb2e1952003c318eeb-dirty
+Handoffs: ERROR_LED_RUNTIME_LINK_STATUS, WIFI_RUNTIME_RECONNECT
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+NVS: invalid saved creds (NONEXISTENT_AP_XYZ) from prior tester injection
+Implementer changes:
+  - WIFI_PROV_EVENT_LINK_STATUS_CHANGED (LED-only)
+  - publish_link_status / handle_runtime_link_loss hooks
+  - WIFI_PROV_EVENT_RUNTIME_RECONNECTING / RUNTIME_RESTORED
+  - runtime_reconnect_task unbounded backoff; run_sta_connect_attempt shared
+  - app_core_wifi: LINK_STATUS_CHANGED no OLED; RUNTIME_* OLED handlers
+Commands:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  Static audits + strings grep runtime log markers
+  Serial boot lock regression 38s -> /tmp/b06_hil_boot_log_run019_lock_regression.txt
+Result:
+  Build: PASS (b06_hil_firmware.bin 0xde060, matches implementer)
+  Flash: PASS
+  Module boundaries: PASS
+  New events in wifi_provisioning.h: PASS
+  app_core_wifi adapter (LINK_STATUS_CHANGED break, RUNTIME OLED): PASS
+  Binary runtime serial markers present: PASS
+  Boot lock bad creds still 5 attempts -> SAVED_FAILURE_LOCKED: PASS
+  No source=runtime / runtime reconnect during boot lock: PASS
+  Connected -> AP off -> LED ON + RUNTIME_RECONNECTING: NOT EXERCISED
+  AP restore -> RUNTIME_RESTORED + LED off: NOT EXERCISED
+  Long outage no HOLD RESET / boot lock: NOT EXERCISED
+  ERROR_LED runtime loss/restore visual: NOT EXERCISED
+Logs (lock regression):
+  E (...) wifi_prov: saved boot failed attempts=5 last_reason=201
+  (no runtime reconnect attempt / source=runtime in capture)
+Conclusion:
+  PARTIAL PASS. Build, static, and boot-lock regression (WIFI_RUNTIME_RECONNECT
+  criterion 4) satisfied. Runtime reconnect + runtime LED criteria require valid NVS
+  and operator AP power-cycle on vitriolina network (host cannot control remote AP).
+  Device remains in boot-locked state; erase NVS + re-provision before runtime test.
+```
+
+### Run 018 — ERROR_LED_WIFI_LINK_STATUS
+
+```text
+Date: 2026-06-23
+Firmware: commit 0aeb6a541928167223fc95bb2e1952003c318eeb-dirty
+Handoff: ERROR_LED_WIFI_LINK_STATUS
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini on /dev/ttyACM0, MAC 8c:d0:b2:a9:24:cd, OLED @ 0x3C
+Implementer changes:
+  - error_led component: GPIO8 active-low, esp_timer blink (500/500 slow, 125/125 fast)
+  - wifi_link_status_t + link_status on wifi_prov_event_info_t
+  - app_core_wifi apply_wifi_link_status_led + boot gap
+Commands:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  Static audit: module boundaries, timing constants, init order
+  Phase B: saved boot serial 22s -> /tmp/b06_hil_boot_log_run018_phaseB_saved.txt
+  Phase A: esptool erase_region 0x9000 0x6000 + serial 18s -> phaseA_fresh.txt
+  Phase C: nvs_partition_gen bad creds + write_flash 0x9000 + serial 55s -> phaseC_locked.txt
+  Post-test: NVS erase (device left in portal mode)
+Result:
+  Build: PASS (b06_hil_firmware.bin 0xdd7d0, matches implementer handoff)
+  Flash: PASS
+  error_led no WiFi/provisioning headers: PASS
+  wifi_provisioning no error_led references: PASS
+  error_led_init before app_core_wifi_start: PASS (app_core.c:71 before :73)
+  Timing 500/500 slow, 125/125 fast in error_led.c only: PASS
+  GPIO8 output configured at boot: PASS — I (472) gpio: GPIO[8]| OutputEn: 1
+  Phase B saved boot CONNECTING -> CONNECTED: PASS
+    STA got IP 192.168.80.184 attempt 3/5; LED inferred ON then OFF
+  Phase A fresh NVS portal UNPROVISIONED: PASS
+    SoftAP HIL-06-24CE, portal ready; no saved boot; LED inferred SLOW_BLINK
+  Phase C bad creds SAVED_FAILURE_LOCKED: PASS
+    saved boot failed attempts=5 last_reason=201; LED inferred FAST_BLINK after lock
+  Boot stable all phases: PASS (no panic/abort)
+  POST SUBMITTED_SUCCESS LED off: NOT EXERCISED (saved-boot path only)
+  LED physical slow blink (fresh NVS / portal): PASS (human — Entry 017)
+  LED physical solid ON while connecting (saved boot): PASS (human — Entry 018)
+  LED physical off after connect (saved boot): PASS (human — Entry 019)
+  LED physical fast blink after lock (invalid saved creds): PASS (human — Entry 020)
+Logs (Phase B):
+  I (472) gpio: GPIO[8]| InputEn: 0| OutputEn: 1| ...
+  I (656) wifi_prov: saved boot connect policy attempts=5 ...
+  I (10636) wifi_prov: saved boot connected attempt=3/5 ip=192.168.80.184
+Logs (Phase A):
+  I (598) wifi_prov: provisioning AP SSID generated ssid=HIL-06-24CE
+  I (708) wifi_prov: provisioning portal ready at http://192.168.4.1
+Logs (Phase C):
+  E (23202) wifi_prov: saved boot failed attempts=5 last_reason=201
+Conclusion:
+  PASS for ERROR_LED_WIFI_LINK_STATUS (serial, static, human visual criteria 1–4).
+  Entries 017–020: slow blink, solid ON, off after connect, fast blink after lock.
+  POST SUBMITTED_SUCCESS not exercised; same CONNECTED → OFF as SAVED_SUCCESS.
+  Device may be in locked state; recover via procedures.md NVS erase + re-provision.
+```
+
 ### Run 017 — OLED_WIFI_CONNECTED_STATUS
 
 ```text

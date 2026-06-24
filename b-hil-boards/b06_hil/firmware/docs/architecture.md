@@ -70,6 +70,9 @@ flowchart TD
 - `components/wifi_provisioning/`: SoftAP, HTTP portal, STA connection attempts,
   and provisioning state transitions. The v1 product contract is defined in
   `docs/wifi_provisioning_architecture.md`.
+- `components/error_led/`: GPIO8 error LED patterns (off, slow/fast blink, solid
+  on). WiFi link mapping is defined in `docs/error_led_wifi_link_architecture.md`;
+  `app_core_wifi` is the adapter from `wifi_link_status_t`.
 - Display interface: conceptual visual stack for the 0.96 inch I2C OLED display.
   The visual contract is defined in `docs/oled_text_display_interface.md`.
   QR matrix generation is defined in `docs/qr_encoder_interface.md`. QR payload

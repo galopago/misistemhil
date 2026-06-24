@@ -25,9 +25,10 @@ static const char *TAG = "wifi_prov";
 #define WIFI_PROV_AP_START_TIMEOUT_MS 10000U
 #define WIFI_PROV_SUCCESS_TEARDOWN_MS 2000U
 #define WIFI_PROV_HTTPD_STACK_SIZE 8192U
-#define WIFI_PROV_SAVED_BOOT_MAX_ATTEMPTS 5U
-#define WIFI_PROV_SAVED_BOOT_PER_ATTEMPT_TIMEOUT_MS 12000U
-#define WIFI_PROV_SAVED_BOOT_SETTLE_MS 1000U
+#define CONNECT_ROUND_MAX_ATTEMPTS 5U
+#define CONNECT_PER_ATTEMPT_TIMEOUT_MS 12000U
+#define CONNECT_ALERT_PHASE_MS 15000U
+#define CONNECT_BOOT_SETTLE_MS 1000U
 
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_AP_STARTED_BIT BIT1
@@ -37,6 +38,7 @@ typedef enum {
     WIFI_PROV_STA_SOURCE_NONE = 0,
     WIFI_PROV_STA_SOURCE_SUBMITTED,
     WIFI_PROV_STA_SOURCE_SAVED,
+    WIFI_PROV_STA_SOURCE_RUNTIME,
 } wifi_prov_sta_source_t;
 
 static wifi_prov_event_cb_t s_event_cb = NULL;
@@ -47,20 +49,32 @@ static esp_netif_t *s_ap_netif = NULL;
 static esp_netif_t *s_sta_netif = NULL;
 static bool s_wifi_stack_ready = false;
 static bool s_portal_active = false;
-static bool s_locked_disconnected = false;
 static char s_form_body[WIFI_PROV_MAX_FORM_BODY_LEN + 1];
 static char s_ap_ssid[33] = {0};
 static char s_sta_ipv4[16] = {0};
 static char s_event_sta_ipv4[16] = {0};
 static char s_event_sta_mac[18] = {0};
 static wifi_prov_sta_source_t s_pending_sta_source = WIFI_PROV_STA_SOURCE_NONE;
-static uint8_t s_saved_attempt = 0;
+static uint8_t s_connect_attempt = 0;
 static int s_last_disconnect_reason = 0;
-static bool s_saved_policy_exhausted = false;
+static wifi_link_status_t s_link_status = WIFI_LINK_STATUS_UNPROVISIONED;
+static TaskHandle_t s_runtime_reconnect_task = NULL;
 
-static const uint32_t s_saved_boot_backoff_ms[WIFI_PROV_SAVED_BOOT_MAX_ATTEMPTS] = {
+static const uint32_t s_connect_backoff_within_round_ms[CONNECT_ROUND_MAX_ATTEMPTS] = {
     0U, 1000U, 3000U, 5000U, 8000U,
 };
+
+static void runtime_reconnect_task(void *arg);
+static void start_runtime_reconnect_if_needed(void);
+static bool connect_cycle_run_round(const wifi_credentials_t *credentials,
+                                    wifi_prov_sta_source_t source);
+static void connect_cycle_run_forever(const wifi_credentials_t *credentials,
+                                      wifi_prov_sta_source_t source);
+
+static void set_link_status(wifi_link_status_t status)
+{
+    s_link_status = status;
+}
 
 static void emit_event(wifi_prov_event_t event, const char *setup_url, const char *ssid,
                        const char *sta_ipv4, const char *sta_mac, esp_err_t status)
@@ -76,8 +90,63 @@ static void emit_event(wifi_prov_event_t event, const char *setup_url, const cha
         .sta_ipv4 = sta_ipv4,
         .sta_mac = sta_mac,
         .status = status,
+        .link_status = s_link_status,
     };
     s_event_cb(&info, s_event_ctx);
+}
+
+static bool runtime_reconnect_allowed(void)
+{
+    if (s_runtime_reconnect_task != NULL || s_portal_active) {
+        return false;
+    }
+    if (s_pending_sta_source == WIFI_PROV_STA_SOURCE_SAVED) {
+        return false;
+    }
+
+    wifi_credentials_t creds = {0};
+    return wifi_credentials_load(&creds);
+}
+
+static void start_runtime_reconnect_if_needed(void)
+{
+    if (!runtime_reconnect_allowed()) {
+        return;
+    }
+
+    const BaseType_t ok =
+        xTaskCreate(runtime_reconnect_task, "wifi_rt_rc", 4096, NULL, 5, &s_runtime_reconnect_task);
+    if (ok != pdPASS) {
+        s_runtime_reconnect_task = NULL;
+        ESP_LOGE(TAG, "runtime reconnect task create failed");
+    }
+}
+
+static void publish_link_status(void)
+{
+    emit_event(WIFI_PROV_EVENT_LINK_STATUS_CHANGED, NULL, NULL, NULL, NULL, ESP_OK);
+}
+
+static void update_runtime_link_status(wifi_link_status_t status)
+{
+    if (s_link_status == status) {
+        return;
+    }
+    set_link_status(status);
+    publish_link_status();
+}
+
+static void handle_runtime_link_loss(void)
+{
+    if (s_portal_active || s_link_status != WIFI_LINK_STATUS_CONNECTED) {
+        return;
+    }
+    if (s_pending_sta_source == WIFI_PROV_STA_SOURCE_SAVED) {
+        return;
+    }
+
+    s_sta_ipv4[0] = '\0';
+    start_runtime_reconnect_if_needed();
 }
 
 static bool prepare_sta_success_event_payload(void)
@@ -105,6 +174,8 @@ static bool prepare_sta_success_event_payload(void)
 
 static void emit_sta_success_event(wifi_prov_event_t event, const char *ssid)
 {
+    set_link_status(WIFI_LINK_STATUS_CONNECTED);
+
     const char *ipv4 = NULL;
     const char *mac = NULL;
     if (prepare_sta_success_event_payload()) {
@@ -120,7 +191,9 @@ static const char *sta_source_label(wifi_prov_sta_source_t source)
     case WIFI_PROV_STA_SOURCE_SUBMITTED:
         return "submitted";
     case WIFI_PROV_STA_SOURCE_SAVED:
-        return "saved";
+        return "boot";
+    case WIFI_PROV_STA_SOURCE_RUNTIME:
+        return "runtime";
     default:
         return "unknown";
     }
@@ -132,9 +205,10 @@ static void log_sta_got_ip(const ip_event_got_ip_t *event, wifi_prov_sta_source_
     if (event != NULL) {
         esp_ip4addr_ntoa(&event->ip_info.ip, ip_str, sizeof(ip_str));
     }
-    if (source == WIFI_PROV_STA_SOURCE_SAVED && s_saved_attempt > 0U) {
-        ESP_LOGI(TAG, "STA got IP ip=%s source=saved attempt=%u/%u", ip_str, s_saved_attempt,
-                 WIFI_PROV_SAVED_BOOT_MAX_ATTEMPTS);
+    if ((source == WIFI_PROV_STA_SOURCE_SAVED || source == WIFI_PROV_STA_SOURCE_RUNTIME) &&
+        s_connect_attempt > 0U) {
+        ESP_LOGI(TAG, "STA got IP ip=%s source=%s attempt=%u/%u", ip_str, sta_source_label(source),
+                 s_connect_attempt, CONNECT_ROUND_MAX_ATTEMPTS);
         return;
     }
     ESP_LOGI(TAG, "STA got IP ip=%s source=%s", ip_str, sta_source_label(source));
@@ -179,18 +253,24 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         case WIFI_EVENT_STA_DISCONNECTED: {
             const wifi_event_sta_disconnected_t *event =
                 (const wifi_event_sta_disconnected_t *)event_data;
-            if (s_pending_sta_source != WIFI_PROV_STA_SOURCE_NONE && event != NULL) {
-                if (s_pending_sta_source == WIFI_PROV_STA_SOURCE_SAVED && s_saved_attempt > 0U) {
-                    ESP_LOGW(TAG, "STA disconnected reason=%d source=saved attempt=%u/%u",
-                             event->reason, s_saved_attempt, WIFI_PROV_SAVED_BOOT_MAX_ATTEMPTS);
-                    s_last_disconnect_reason = (int)event->reason;
-                    xEventGroupSetBits(s_wifi_event_group, WIFI_STA_DISCONNECTED_BIT);
-                } else {
-                    ESP_LOGW(TAG, "STA disconnected reason=%d source=%s", event->reason,
-                             sta_source_label(s_pending_sta_source));
-                }
+            if (s_pending_sta_source != WIFI_PROV_STA_SOURCE_NONE && event != NULL &&
+                s_connect_attempt > 0U &&
+                (s_pending_sta_source == WIFI_PROV_STA_SOURCE_SAVED ||
+                 s_pending_sta_source == WIFI_PROV_STA_SOURCE_RUNTIME)) {
+                ESP_LOGW(TAG, "STA disconnected reason=%d source=%s attempt=%u/%u",
+                         event->reason, sta_source_label(s_pending_sta_source), s_connect_attempt,
+                         CONNECT_ROUND_MAX_ATTEMPTS);
+                s_last_disconnect_reason = (int)event->reason;
+                xEventGroupSetBits(s_wifi_event_group, WIFI_STA_DISCONNECTED_BIT);
+            } else if (s_pending_sta_source != WIFI_PROV_STA_SOURCE_NONE && event != NULL) {
+                ESP_LOGW(TAG, "STA disconnected reason=%d source=%s", event->reason,
+                         sta_source_label(s_pending_sta_source));
             }
             xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+            if (event != NULL && s_pending_sta_source == WIFI_PROV_STA_SOURCE_NONE) {
+                ESP_LOGW(TAG, "STA disconnected reason=%d source=runtime", event->reason);
+            }
+            handle_runtime_link_loss();
             break;
         }
         default:
@@ -201,13 +281,14 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         if (s_pending_sta_source == WIFI_PROV_STA_SOURCE_NONE) {
-            if (s_saved_policy_exhausted) {
+            if (!s_portal_active && s_link_status != WIFI_LINK_STATUS_CONNECTED) {
                 const ip_event_got_ip_t *event = (const ip_event_got_ip_t *)event_data;
-                char ip_str[16] = {0};
                 if (event != NULL) {
-                    esp_ip4addr_ntoa(&event->ip_info.ip, ip_str, sizeof(ip_str));
+                    esp_ip4addr_ntoa(&event->ip_info.ip, s_sta_ipv4, sizeof(s_sta_ipv4));
                 }
-                ESP_LOGW(TAG, "stale STA got IP ignored ip=%s source=saved", ip_str);
+                log_sta_got_ip(event, WIFI_PROV_STA_SOURCE_NONE);
+                xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+                update_runtime_link_status(WIFI_LINK_STATUS_CONNECTED);
             }
             return;
         }
@@ -218,6 +299,14 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         }
         log_sta_got_ip(event, s_pending_sta_source);
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        return;
+    }
+
+    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_LOST_IP) {
+        if (s_pending_sta_source == WIFI_PROV_STA_SOURCE_NONE) {
+            ESP_LOGW(TAG, "STA lost IP source=runtime");
+            handle_runtime_link_loss();
+        }
     }
 }
 
@@ -368,20 +457,21 @@ static esp_err_t wait_for_sta_connected(wifi_prov_sta_source_t source, uint32_t 
     return (bits & WIFI_CONNECTED_BIT) != 0U ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
-static esp_err_t wait_for_saved_sta_attempt(uint8_t attempt, uint32_t timeout_ms)
+static esp_err_t run_sta_connect_attempt(uint8_t attempt, uint32_t timeout_ms,
+                                         wifi_prov_sta_source_t source)
 {
     xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_STA_DISCONNECTED_BIT);
     s_sta_ipv4[0] = '\0';
     s_last_disconnect_reason = 0;
-    s_saved_attempt = attempt;
-    s_pending_sta_source = WIFI_PROV_STA_SOURCE_SAVED;
+    s_connect_attempt = attempt;
+    s_pending_sta_source = source;
 
     (void)esp_wifi_disconnect();
     vTaskDelay(pdMS_TO_TICKS(100));
 
     esp_err_t err = esp_wifi_connect();
     if (err != ESP_OK) {
-        s_saved_attempt = 0;
+        s_connect_attempt = 0;
         s_pending_sta_source = WIFI_PROV_STA_SOURCE_NONE;
         return err;
     }
@@ -390,7 +480,7 @@ static esp_err_t wait_for_saved_sta_attempt(uint8_t attempt, uint32_t timeout_ms
         xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_STA_DISCONNECTED_BIT,
                             pdTRUE, pdFALSE, pdMS_TO_TICKS(timeout_ms));
 
-    s_saved_attempt = 0;
+    s_connect_attempt = 0;
     s_pending_sta_source = WIFI_PROV_STA_SOURCE_NONE;
 
     if ((bits & WIFI_CONNECTED_BIT) != 0U) {
@@ -416,6 +506,110 @@ static esp_err_t wait_for_ap_started(uint32_t timeout_ms)
         xEventGroupWaitBits(s_wifi_event_group, WIFI_AP_STARTED_BIT, pdTRUE, pdFALSE,
                             pdMS_TO_TICKS(timeout_ms));
     return (bits & WIFI_AP_STARTED_BIT) != 0U ? ESP_OK : ESP_ERR_TIMEOUT;
+}
+
+static bool connect_cycle_run_round(const wifi_credentials_t *credentials,
+                                    wifi_prov_sta_source_t source)
+{
+    set_link_status(WIFI_LINK_STATUS_CONNECTING);
+    emit_event(WIFI_PROV_EVENT_CONNECT_CYCLE_ACTIVE, NULL, credentials->ssid, NULL, NULL,
+               ESP_OK);
+    ESP_LOGI(TAG, "connect cycle round start source=%s", sta_source_label(source));
+
+    for (uint8_t attempt = 1U; attempt <= CONNECT_ROUND_MAX_ATTEMPTS; ++attempt) {
+        if (s_portal_active) {
+            return false;
+        }
+
+        wifi_credentials_t loaded = {0};
+        if (!wifi_credentials_load(&loaded)) {
+            return false;
+        }
+
+        ESP_LOGI(TAG, "connect cycle attempt %u/%u start source=%s", attempt,
+                 CONNECT_ROUND_MAX_ATTEMPTS, sta_source_label(source));
+
+        const esp_err_t err =
+            run_sta_connect_attempt(attempt, CONNECT_PER_ATTEMPT_TIMEOUT_MS, source);
+        if (err == ESP_OK) {
+            char ip_str[16] = {0};
+            if (s_sta_netif != NULL) {
+                esp_netif_ip_info_t ip_info = {0};
+                if (esp_netif_get_ip_info(s_sta_netif, &ip_info) == ESP_OK) {
+                    esp_ip4addr_ntoa(&ip_info.ip, ip_str, sizeof(ip_str));
+                }
+            }
+            ESP_LOGI(TAG, "connect cycle restored ip=%s source=%s", ip_str,
+                     sta_source_label(source));
+            emit_sta_success_event(WIFI_PROV_EVENT_CONNECT_RESTORED, credentials->ssid);
+            return true;
+        }
+
+        const int last_reason = saved_attempt_failure_reason();
+        const uint32_t backoff_ms = s_connect_backoff_within_round_ms[attempt - 1U];
+        ESP_LOGW(TAG, "connect cycle attempt %u/%u failed reason=%d backoff_ms=%lu source=%s",
+                 attempt, CONNECT_ROUND_MAX_ATTEMPTS, last_reason, (unsigned long)backoff_ms,
+                 sta_source_label(source));
+
+        if (attempt < CONNECT_ROUND_MAX_ATTEMPTS && backoff_ms > 0U) {
+            vTaskDelay(pdMS_TO_TICKS(backoff_ms));
+        }
+    }
+
+    set_link_status(WIFI_LINK_STATUS_CONNECTING_ALERT);
+    emit_event(WIFI_PROV_EVENT_CONNECT_ALERT_PHASE, NULL, credentials->ssid, NULL, NULL,
+               ESP_OK);
+    ESP_LOGI(TAG, "connect cycle alert_phase_ms=%u source=%s", CONNECT_ALERT_PHASE_MS,
+             sta_source_label(source));
+    vTaskDelay(pdMS_TO_TICKS(CONNECT_ALERT_PHASE_MS));
+    return false;
+}
+
+static void connect_cycle_run_forever(const wifi_credentials_t *credentials,
+                                      wifi_prov_sta_source_t source)
+{
+    ESP_LOGI(TAG,
+             "connect cycle policy round_attempts=%u per_attempt_timeout_ms=%u alert_phase_ms=%u",
+             CONNECT_ROUND_MAX_ATTEMPTS, CONNECT_PER_ATTEMPT_TIMEOUT_MS, CONNECT_ALERT_PHASE_MS);
+
+    while (true) {
+        if (s_portal_active) {
+            return;
+        }
+
+        wifi_credentials_t loaded = {0};
+        if (!wifi_credentials_load(&loaded)) {
+            return;
+        }
+
+        if (connect_cycle_run_round(credentials, source)) {
+            return;
+        }
+    }
+}
+
+static void runtime_reconnect_task(void *arg)
+{
+    (void)arg;
+
+    wifi_credentials_t credentials = {0};
+    if (!wifi_credentials_load(&credentials)) {
+        s_runtime_reconnect_task = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    if (apply_sta_config(&credentials) != ESP_OK) {
+        ESP_LOGE(TAG, "runtime connect cycle apply sta config failed");
+        s_runtime_reconnect_task = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    connect_cycle_run_forever(&credentials, WIFI_PROV_STA_SOURCE_RUNTIME);
+
+    s_runtime_reconnect_task = NULL;
+    vTaskDelete(NULL);
 }
 
 static esp_err_t start_http_server(void)
@@ -554,11 +748,13 @@ static esp_err_t provision_post_handler(httpd_req_t *req)
 
     ESP_LOGI(TAG, "POST /provision parsed form");
 
+    set_link_status(WIFI_LINK_STATUS_UNPROVISIONED);
     emit_event(WIFI_PROV_EVENT_SUBMITTED_CONNECTING, NULL, credentials.ssid, NULL, NULL,
                ESP_OK);
 
     esp_err_t sta_netif_err = ensure_sta_netif();
     if (sta_netif_err != ESP_OK) {
+        set_link_status(WIFI_LINK_STATUS_UNPROVISIONED);
         emit_event(WIFI_PROV_EVENT_SUBMITTED_FAILURE, NULL, credentials.ssid, NULL, NULL,
                    sta_netif_err);
         return send_provision_failure_page(req, "WiFi connection failed. Check SSID and password.",
@@ -568,6 +764,7 @@ static esp_err_t provision_post_handler(httpd_req_t *req)
     esp_err_t mode_err = esp_wifi_set_mode(WIFI_MODE_APSTA);
     if (mode_err != ESP_OK) {
         ESP_LOGE(TAG, "set apsta failed: %s", esp_err_to_name(mode_err));
+        set_link_status(WIFI_LINK_STATUS_UNPROVISIONED);
         emit_event(WIFI_PROV_EVENT_SUBMITTED_FAILURE, NULL, credentials.ssid, NULL, NULL,
                    mode_err);
         return send_provision_failure_page(req, "WiFi connection failed. Check SSID and password.",
@@ -577,6 +774,7 @@ static esp_err_t provision_post_handler(httpd_req_t *req)
     esp_err_t cfg_err = apply_sta_config(&credentials);
     if (cfg_err != ESP_OK) {
         ESP_LOGE(TAG, "apply sta config failed: %s", esp_err_to_name(cfg_err));
+        set_link_status(WIFI_LINK_STATUS_UNPROVISIONED);
         emit_event(WIFI_PROV_EVENT_SUBMITTED_FAILURE, NULL, credentials.ssid, NULL, NULL,
                    cfg_err);
         return send_provision_failure_page(req, "WiFi connection failed. Check SSID and password.",
@@ -588,6 +786,7 @@ static esp_err_t provision_post_handler(httpd_req_t *req)
     const esp_err_t connect_err =
         wait_for_sta_connected(WIFI_PROV_STA_SOURCE_SUBMITTED, WIFI_PROV_STA_TIMEOUT_MS);
     if (connect_err != ESP_OK) {
+        set_link_status(WIFI_LINK_STATUS_UNPROVISIONED);
         emit_event(WIFI_PROV_EVENT_SUBMITTED_FAILURE, NULL, credentials.ssid, NULL, NULL,
                    connect_err);
         return send_provision_failure_page(req, "WiFi connection failed. Check SSID and password.",
@@ -596,6 +795,7 @@ static esp_err_t provision_post_handler(httpd_req_t *req)
 
     const esp_err_t save_err = wifi_credentials_save(&credentials);
     if (save_err != ESP_OK) {
+        set_link_status(WIFI_LINK_STATUS_UNPROVISIONED);
         emit_event(WIFI_PROV_EVENT_ERROR, NULL, credentials.ssid, NULL, NULL, save_err);
         return send_provision_failure_page(req, "WiFi connection failed. Check SSID and password.",
                                            credentials.ssid, 200);
@@ -607,6 +807,7 @@ static esp_err_t provision_post_handler(httpd_req_t *req)
         ESP_LOGE(TAG, "POST /provision success response failed: %s", esp_err_to_name(page_err));
         ESP_LOGW(TAG, "credentials rollback after success page failure");
         (void)wifi_credentials_erase();
+        set_link_status(WIFI_LINK_STATUS_UNPROVISIONED);
         emit_event(WIFI_PROV_EVENT_SUBMITTED_FAILURE, NULL, credentials.ssid, NULL, NULL,
                    page_err);
         return send_provision_failure_page(req, "WiFi connection failed. Check SSID and password.",
@@ -679,7 +880,7 @@ esp_err_t wifi_provisioning_init(wifi_prov_event_cb_t cb, void *ctx)
 
 esp_err_t wifi_provisioning_start_ap_portal(void)
 {
-    s_locked_disconnected = false;
+    set_link_status(WIFI_LINK_STATUS_UNPROVISIONED);
 
     esp_err_t err = ensure_wifi_stack();
     if (err != ESP_OK) {
@@ -754,8 +955,7 @@ esp_err_t wifi_provisioning_connect_saved(const wifi_credentials_t *credentials)
     }
 
     s_portal_active = false;
-    s_locked_disconnected = false;
-    s_saved_policy_exhausted = false;
+    set_link_status(WIFI_LINK_STATUS_CONNECTING);
 
     esp_err_t err = ensure_wifi_stack();
     if (err != ESP_OK) {
@@ -769,54 +969,14 @@ esp_err_t wifi_provisioning_connect_saved(const wifi_credentials_t *credentials)
         return err;
     }
 
-    emit_event(WIFI_PROV_EVENT_SAVED_CONNECTING, NULL, credentials->ssid, NULL, NULL,
-               ESP_OK);
-
     ESP_RETURN_ON_ERROR(esp_wifi_set_mode(WIFI_MODE_STA), TAG, "set sta mode failed");
     ESP_RETURN_ON_ERROR(esp_wifi_start(), TAG, "wifi start failed");
     ESP_RETURN_ON_ERROR(apply_sta_config(credentials), TAG, "apply sta config failed");
 
-    ESP_LOGI(TAG, "saved boot connect policy attempts=%u per_attempt_timeout_ms=%u",
-             WIFI_PROV_SAVED_BOOT_MAX_ATTEMPTS, WIFI_PROV_SAVED_BOOT_PER_ATTEMPT_TIMEOUT_MS);
-    vTaskDelay(pdMS_TO_TICKS(WIFI_PROV_SAVED_BOOT_SETTLE_MS));
+    vTaskDelay(pdMS_TO_TICKS(CONNECT_BOOT_SETTLE_MS));
 
-    int last_reason = WIFI_REASON_CONNECTION_FAIL;
-
-    for (uint8_t attempt = 1U; attempt <= WIFI_PROV_SAVED_BOOT_MAX_ATTEMPTS; ++attempt) {
-        ESP_LOGI(TAG, "saved boot attempt %u/%u start", attempt, WIFI_PROV_SAVED_BOOT_MAX_ATTEMPTS);
-
-        err = wait_for_saved_sta_attempt(attempt, WIFI_PROV_SAVED_BOOT_PER_ATTEMPT_TIMEOUT_MS);
-        if (err == ESP_OK) {
-            char ip_str[16] = {0};
-            if (s_sta_netif != NULL) {
-                esp_netif_ip_info_t ip_info = {0};
-                if (esp_netif_get_ip_info(s_sta_netif, &ip_info) == ESP_OK) {
-                    esp_ip4addr_ntoa(&ip_info.ip, ip_str, sizeof(ip_str));
-                }
-            }
-            ESP_LOGI(TAG, "saved boot connected attempt=%u/%u ip=%s", attempt,
-                     WIFI_PROV_SAVED_BOOT_MAX_ATTEMPTS, ip_str);
-            emit_sta_success_event(WIFI_PROV_EVENT_SAVED_SUCCESS, credentials->ssid);
-            return ESP_OK;
-        }
-
-        last_reason = saved_attempt_failure_reason();
-        const uint32_t backoff_ms = s_saved_boot_backoff_ms[attempt - 1U];
-        ESP_LOGW(TAG, "saved boot attempt %u/%u failed reason=%d backoff_ms=%lu", attempt,
-                 WIFI_PROV_SAVED_BOOT_MAX_ATTEMPTS, last_reason, (unsigned long)backoff_ms);
-
-        if (attempt < WIFI_PROV_SAVED_BOOT_MAX_ATTEMPTS && backoff_ms > 0U) {
-            vTaskDelay(pdMS_TO_TICKS(backoff_ms));
-        }
-    }
-
-    s_saved_policy_exhausted = true;
-    ESP_LOGE(TAG, "saved boot failed attempts=%u last_reason=%d",
-             WIFI_PROV_SAVED_BOOT_MAX_ATTEMPTS, last_reason);
-    s_locked_disconnected = true;
-    emit_event(WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED, NULL, credentials->ssid, NULL, NULL,
-               ESP_FAIL);
-    return ESP_FAIL;
+    connect_cycle_run_forever(credentials, WIFI_PROV_STA_SOURCE_SAVED);
+    return ESP_OK;
 }
 
 esp_err_t wifi_provisioning_stop(void)
@@ -841,5 +1001,5 @@ bool wifi_provisioning_portal_active(void)
 
 bool wifi_provisioning_locked_disconnected(void)
 {
-    return s_locked_disconnected;
+    return false;
 }

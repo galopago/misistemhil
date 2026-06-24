@@ -98,6 +98,52 @@ Do not dump or log NVS contents before erase (contains WiFi credentials).
 | GPIO7 hold ≥ 2000 ms at boot | Normative factory reset per architecture; use when implemented. |
 | Reflash only | Does **not** clear NVS unless flash image or erase step includes NVS. |
 
+## Inject invalid WiFi credentials (saved-boot lock test)
+
+### When to use
+
+- Exercise **SAVED_FAILURE_LOCKED** without reflashing firmware.
+- Validate error LED **fast blink** (`DISCONNECTED`) after 5 failed STA attempts.
+- OLED should show `WIFI` / `FAILED` / `HOLD` / `RESET`.
+
+### Command
+
+```bash
+source ~/esp/esp-idf/export.sh
+cat > /tmp/nvs_wifi_bad.csv << 'EOF'
+key,type,encoding,value
+wifi_prov,namespace,,
+ssid,data,string,NONEXISTENT_AP_XYZ
+password,data,string,badpass12345
+provisioned,data,u8,1
+EOF
+python "$IDF_PATH/components/nvs_flash/nvs_partition_generator/nvs_partition_gen.py" \
+  generate /tmp/nvs_wifi_bad.csv /tmp/nvs_wifi_bad.bin 0x6000
+esptool.py --port /dev/ttyACM0 --chip esp32c3 write_flash 0x9000 /tmp/nvs_wifi_bad.bin
+```
+
+Change `ssid` / `password` as needed. Namespace and keys must match
+`components/wifi_credentials/wifi_credentials.c` (`wifi_prov`, `ssid`, `password`,
+`provisioned`).
+
+### Expected result after reset (~25–35 s)
+
+```text
+I (...) wifi_prov: saved boot attempt 5/5 failed reason=...
+E (...) wifi_prov: saved boot failed attempts=5 last_reason=...
+```
+
+Device stays in locked state (no portal until factory reset or NVS erase).
+Error LED: **fast blink** (~125 ms).
+
+### Recovery
+
+```bash
+esptool.py --port /dev/ttyACM0 --chip esp32c3 erase_region 0x9000 0x6000
+```
+
+Then re-provision via portal, or inject valid credentials with the same CSV flow.
+
 ## Standard flash and monitor (reference)
 
 ```bash

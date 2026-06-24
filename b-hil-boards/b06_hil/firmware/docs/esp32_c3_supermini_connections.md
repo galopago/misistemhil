@@ -87,6 +87,10 @@ Active-low discrete signals:
 - The `INA219` devices use fixed expected addresses `0x40`, `0x41`, and `0x42`.
 - The OLED display address is valid only when it is `0x3C` or `0x3D`.
 - `GPIO8` must be modeled as an active-low output.
+- Product WiFi link status drives the error LED via `wifi_link_status_t` and
+  `docs/error_led_wifi_link_architecture.md` (slow blink = unprovisioned, solid ON
+  = saved connect in progress, off = connected, fast blink = disconnected with
+  creds).
 - `GPIO7` must be modeled as an active-low input with pull-up behavior.
 - A pressed factory reset switch is represented by logical `0`.
 - A released factory reset switch is represented by logical `1`.

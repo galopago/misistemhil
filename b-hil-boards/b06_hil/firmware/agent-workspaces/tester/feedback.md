@@ -8,6 +8,115 @@ maintained in English.
 
 ## Entries
 
+### Entry 023 — Run 020 post-recovery portal OK (operator confirmed)
+
+```text
+Date: 2026-06-23
+Person: Human operator (project owner)
+Context: WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2 / Run 020, after NVS erase and re-provision
+
+Human observation:
+  - Device restored to portal mode after NVS erase; full flow works correctly — PASS
+
+Classification:
+  - Post-test recovery / normal provisioning path: PASS (human)
+```
+
+### Entry 022 — Run 020 connect cycle LED slow/fast repeat (operator confirmed)
+
+```text
+Date: 2026-06-23
+Person: Human operator (project owner)
+Context: WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2 / Run 020, fake NVS creds NONEXISTENT_AP_XYZ
+
+Human observation:
+  - LED shows slow blink during connect attempts — PASS
+  - After round failure, fast blink phase — PASS
+  - Cycle repeats indefinitely (slow again, then fast, etc.) — PASS
+  - OLED stays WIFI/CONNECTING; no HOLD RESET — implied by prior context
+
+Classification:
+  - v2 connect cycle LED criteria 2–4 (slow / fast 15s / repeat): PASS (human)
+  - v2 no terminal boot lock during creds outage: PASS (human)
+```
+
+### Entry 021 — Run 020 portal provision + LED v2 no-creds (operator confirmed)
+
+```text
+Date: 2026-06-23
+Person: Human operator (project owner)
+Context: WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2 / Run 020, after NVS erase
+
+Human observation:
+  - Portal provisioning flow successful (POST vitriolina) — PASS
+  - LED behavior with no credentials / portal (solid ON, v2) — PASS
+
+Classification:
+  - v2 criterion 1 (empty NVS / portal LED ON): PASS (human)
+  - Portal provisioning UX: PASS (human)
+```
+
+### Entry 020 — Run 018 error LED fast blink after saved-boot lock (operator confirmed)
+
+```text
+Date: 2026-06-23
+Person: Human operator (project owner)
+Context: ERROR_LED_WIFI_LINK_STATUS / Run 018, injected invalid NVS credentials
+
+Human observation:
+  - After 5 failed STA attempts with saved (invalid) credentials, error LED fast blink — PASS
+  - Matches expected DISCONNECTED / ERROR_LED_PATTERN_FAST_BLINK (125 ms) after SAVED_FAILURE_LOCKED
+
+Classification:
+  - ERROR_LED_WIFI_LINK_STATUS Phase C (locked) human visual: PASS
+  - ERROR_LED_WIFI_LINK_STATUS all operator-visible criteria: PASS
+```
+
+### Entry 019 — Run 018 error LED off after saved-credentials connect (operator confirmed)
+
+```text
+Date: 2026-06-23
+Person: Human operator (project owner)
+Context: ERROR_LED_WIFI_LINK_STATUS / Run 018, saved-credentials boot success
+
+Human observation:
+  - After STA connects with saved credentials, error LED turns off — PASS
+  - Matches expected CONNECTED / ERROR_LED_PATTERN_OFF (SAVED_SUCCESS)
+
+Classification:
+  - ERROR_LED_WIFI_LINK_STATUS Phase B (connected) human visual: PASS
+```
+
+### Entry 018 — Run 018 error LED solid ON while connecting (operator confirmed)
+
+```text
+Date: 2026-06-23
+Person: Human operator (project owner)
+Context: ERROR_LED_WIFI_LINK_STATUS / Run 018, saved-credentials boot
+
+Human observation:
+  - With saved WiFi credentials, error LED stays solid ON while STA is connecting — PASS
+  - Matches expected CONNECTING / ERROR_LED_PATTERN_ON
+
+Classification:
+  - ERROR_LED_WIFI_LINK_STATUS Phase B (connecting) human visual: PASS
+```
+
+### Entry 017 — Run 018 error LED slow blink without credentials (operator confirmed)
+
+```text
+Date: 2026-06-23
+Person: Human operator (project owner)
+Context: ERROR_LED_WIFI_LINK_STATUS / Run 018, fresh NVS / portal mode
+
+Human observation:
+  - Without saved WiFi credentials, error LED (GPIO8) shows slow blink — PASS
+  - Matches expected UNPROVISIONED / ERROR_LED_PATTERN_SLOW_BLINK (500 ms)
+
+Classification:
+  - ERROR_LED_WIFI_LINK_STATUS Phase A human visual: PASS
+```
+
 ### Entry 016 — Run 017 WiFi connected OLED (operator confirmed)
 
 ```text

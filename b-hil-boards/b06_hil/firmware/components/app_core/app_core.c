@@ -5,6 +5,7 @@
 #include "display.h"
 #include "display_controller.h"
 #include "display_geometry_test.h"
+#include "error_led.h"
 #include "esp_check.h"
 #include "esp_log.h"
 #include "i2c_bus.h"
@@ -67,10 +68,17 @@ void app_core_start(void)
     ESP_ERROR_CHECK(display_start(&cfg));
     ESP_ERROR_CHECK(display_controller_init());
 
+    ESP_ERROR_CHECK(error_led_init());
+
     esp_err_t wifi_err = app_core_wifi_start();
     if (wifi_err != ESP_OK) {
         ESP_LOGW(TAG, "WiFi startup failed: %s", esp_err_to_name(wifi_err));
     }
+}
+
+esp_err_t app_core_error_led_set_pattern(error_led_pattern_t pattern)
+{
+    return error_led_set_pattern(pattern);
 }
 
 esp_err_t app_core_display_show_template(display_layout_template_t template_id,
