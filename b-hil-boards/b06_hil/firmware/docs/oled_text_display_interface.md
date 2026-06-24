@@ -857,12 +857,24 @@ DisplayLayout
           font_policy: AUTO_FIT or SMALL
 ```
 
-Recommended text examples:
+Recommended text examples (demo / documentation only):
 
 - `SETUP`
 - `SCAN QR`
 - `AP MODE`
-- A short local address if it fits.
+
+Product provisioning screen (normative; see
+`docs/wifi_provisioning_architecture.md` **Provisioning setup OLED screen**):
+
+| Line | Text |
+| --- | --- |
+| 0 | `1 JOIN` |
+| 1 | `HIL-06-` (SSID prefix; dynamic) |
+| 2 | `24CE` (SSID suffix; dynamic) |
+| 3 | `2 SCAN QR` |
+
+Do not use `WIFI` / `SETUP` on the product provisioning path after handoff
+`OLED_PROVISIONING_SETUP_UX` is implemented.
 
 ## Truncation And Overflow
 
@@ -1272,7 +1284,7 @@ Expected behavior:
 - Usable text rect is `{ x: 2, y: 48, width: 66, height: 16 }`.
 - The visible portion is rendered without error.
 
-### Golden 5: QR Left, Text Right
+### Golden 5: QR Left, Text Right (demo example)
 
 Input:
 
@@ -1324,6 +1336,108 @@ Expected behavior:
 - QR rendering first tries scale `2`.
 - If scale `2` does not fit, scale `1` is tried.
 - Text region uses four `16 px` line bands inside the right half.
+
+### Golden 6: QR Left, Text Right (product provisioning)
+
+Normative product screen when no WiFi credentials are saved. Source handoff:
+`OLED_PROVISIONING_SETUP_UX`.
+
+Input:
+
+```json
+{
+  "layout": {
+    "regions": [
+      {
+        "id": "qr",
+        "rect": { "x": 0, "y": 0, "width": 64, "height": 64 },
+        "content": {
+          "type": "QR",
+          "qr": {
+            "payload": "http://192.168.4.1",
+            "error_correction": "LOW",
+            "scale": "AUTO",
+            "quiet_zone_modules": 1
+          }
+        }
+      },
+      {
+        "id": "text",
+        "rect": { "x": 64, "y": 0, "width": 64, "height": 64 },
+        "content": {
+          "type": "TEXT",
+          "text": {
+            "max_lines": 4,
+            "font_policy": "SMALL",
+            "horizontal_align": "LEFT",
+            "vertical_align": "CENTER",
+            "lines": [
+              { "text": "1 JOIN" },
+              { "text": "HIL-06-" },
+              { "text": "24CE" },
+              { "text": "2 SCAN QR" }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+Expected behavior:
+
+- Same clipping and QR scale rules as Golden 5.
+- All four text lines render without pixel truncation for the example SSID
+  `HIL-06-24CE` (prefix 7 + suffix 4 chars each fit within 60 px usable width
+  at 6 px/glyph SMALL font).
+- Lines 1 and 2 concatenated equal the full provisioning AP SSID shown in the
+  phone WiFi list.
+- Line 0 and line 3 are fixed literals; only lines 1–2 vary per device.
+
+### Golden 7: Full Four Lines (product WiFi connected)
+
+Normative product screen after STA connection succeeds. Source handoff:
+`OLED_WIFI_CONNECTED_STATUS`.
+
+Input:
+
+```json
+{
+  "layout": {
+    "regions": [
+      {
+        "id": "main",
+        "rect": { "x": 0, "y": 0, "width": 128, "height": 64 },
+        "content": {
+          "type": "TEXT",
+          "text": {
+            "max_lines": 4,
+            "font_policy": "AUTO_FIT",
+            "horizontal_align": "LEFT",
+            "vertical_align": "CENTER",
+            "lines": [
+              { "text": "WIFI OK" },
+              { "text": "192.168.1.42" },
+              { "text": "AA:BB:CC" },
+              { "text": "DD:EE:FF" }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+Expected behavior:
+
+- Four `16 px` line bands across full 128×64 display.
+- AUTO_FIT selects SMALL font (6 px/glyph) for 16 px band height.
+- Line 1 shows full IPv4 without truncation for addresses up to 15 characters.
+- Lines 2 and 3 are the MAC split of `AA:BB:CC:DD:EE:FF` at indices 0–7 and
+  9–16; concatenating with `:` at index 8 restores the full MAC string.
+- Screen persists until replaced by a later display instruction.
 
 ## Implementation Constraints For `b06_hil`
 

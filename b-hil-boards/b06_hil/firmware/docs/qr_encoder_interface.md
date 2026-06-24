@@ -87,7 +87,7 @@ Rules:
 
 ```mermaid
 flowchart LR
-    InstructionSource[instruction source TBD] --> AppCore[app_core]
+    InstructionSource[product instruction sources] --> AppCore[app_core]
     AppCore --> SetupUrl[setup_url validate when QR]
     AppCore --> DisplayController[DisplayController]
     DisplayController --> DisplayTask[display_task]
@@ -101,7 +101,7 @@ WiFi or network APIs.
 
 | Layer | Responsibility | Must not |
 | --- | --- | --- |
-| Instruction source (TBD) | Emit display instructions with payload when product logic requires | Draw pixels, encode QR, or call `display_controller_*` |
+| Product instruction sources | Emit display instructions with payload when product logic requires | Draw pixels, encode QR, or call `display_controller_*` |
 | `setup_url` | Validate `http://IPv4` string shape | Talk to display hardware or network stacks |
 | `app_core` | Accept instructions; call `display_controller_*` | Encode QR matrices; touch I2C; call WiFi/network APIs for display |
 | `DisplayController` | Build layout from instruction payload | Infer payload origin |
@@ -325,6 +325,27 @@ Rules:
 - `DisplayController` MUST NOT discover or construct payload strings from outside
   the instruction it receives via `app_core`.
 
+## WiFi Provisioning Instruction Source
+
+`docs/wifi_provisioning_architecture.md` defines WiFi provisioning as one concrete
+v1 product instruction source for QR setup display.
+
+Rules:
+
+- When provisioning AP mode is active, WiFi provisioning emits a neutral
+  provisioning event. `app_core` may map that event to
+  `app_core_display_show_qr_setup("http://192.168.4.1", ...)`.
+- The QR payload remains the same root-only `http://IPv4` product profile defined
+  in this document.
+- WiFi provisioning MUST NOT include `app_core.h`, `display_controller.h`, or any
+  display header.
+- WiFi provisioning MUST NOT call `display_controller_*` directly.
+- The display renderer, display controller, and `display_qr` encoder MUST NOT
+  include WiFi, HTTP, `esp_netif`, or provisioning headers.
+- `setup_url` remains a string-shape helper. It does not know whether
+  `http://192.168.4.1` came from WiFi provisioning, a demo, a test, or another
+  future product instruction source.
+
 ## Invalid Input and Fallback Behavior
 
 | Input | Encoder | Renderer |
@@ -386,9 +407,7 @@ Tester:
 
 These items do not block encoder or delivery-contract implementation:
 
-1. **Instruction source identity** — component or role that emits display
-   instructions (may live entirely inside `app_core` if centralized).
-2. **Future URL extensions** — `https://`, port, path in QR payload, IPv6 remain
+1. **Future URL extensions** — `https://`, port, path in QR payload, IPv6 remain
    out of scope until a new product profile is authorized.
 
 Closed in v1 architecture:
@@ -404,3 +423,6 @@ Closed in v1 architecture:
   `34f1002501fa2bcb0a054f4311795b8cbb977f5b`.
 - **Measured QR integration size** — implementer handoff records
   `b06_hil_firmware.bin` `0x39f00` after QR integration.
+- **WiFi provisioning source** — provisioning AP mode may request
+  `app_core_display_show_qr_setup("http://192.168.4.1", ...)` as a product
+  instruction source; display and encoder code remain decoupled from WiFi.

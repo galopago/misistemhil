@@ -5,8 +5,7 @@ maintained in English.
 
 ## Pending (authorized now)
 
-- `DISPLAY_VISUAL_DEMO_PROTOCOL`: Kconfig + `app_core_display_demo.c` per
-  `docs/display_visual_demo_protocol.md` and architect handoff.
+- None.
 
 ## Pending (not authorized yet)
 
@@ -16,6 +15,18 @@ maintained in English.
 
 ## Completed
 
+- `OLED_WIFI_CONNECTED_STATUS`: connected OLED shows WIFI OK + STA IPv4 + split MAC.
+- `OLED_PROVISIONING_SETUP_UX`: provisioning OLED shows split SSID + join/scan instructions.
+- `PRODUCT_BOOT_DISPLAY_AND_DYNAMIC_AP_SSID`: dynamic AP SSID `HIL-06-<MAC4>`,
+  display demo retired from product boot.
+- `WIFI_PROVISIONING_SAVED_BOOT_RELIABILITY`: WPA2/WPA3 STA config, saved boot retry
+  policy (5 attempts, backoff, early disconnect), stale GOT_IP guard.
+- `WIFI_PROVISIONING_POST_SUCCESS_COMMIT`: fresh GOT_IP, success ordering, rollback, deferred teardown.
+- `WIFI_PROVISIONING_HTTP_HEADER_BUDGET`: CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048, POST milestone logs.
+- `WIFI_PROVISIONING_HTTP_STACK_SAFETY`: chunked HTML, static form body, httpd stack 8192.
+- `WIFI_PROVISIONING_PORTAL_REACHABILITY`: AP/DHCP before wifi start, /health, diagnostics.
+- `WIFI_PROVISIONING_ARCHITECTURE`: wifi_credentials, wifi_provisioning, app_core_wifi.
+- `DISPLAY_VISUAL_DEMO_PROTOCOL`: validated in Run 006; retired from product boot.
 - `DISPLAY_DELIVERY_CONTRACT`: app_core display callback API.
 - `QR_ENCODER_INTERFACE`: setup_url, Nayuki qrcodegen, display_qr_generate.
 - `I2C_BUS_ARCHITECTURE` phase 1: shared bus, board helper, app_core startup.

@@ -114,6 +114,408 @@ Open questions:
   - Product instruction source identity remains open if not internal to app_core.
 ```
 
+## 2026-06-23 — WiFi Provisioning v1 Architecture
+
+```text
+Date: 2026-06-23
+Decision: WiFi provisioning v1 uses an open device SoftAP at `192.168.4.1`,
+  a root HTTP form at `http://192.168.4.1/`, normal NVS
+  credential persistence, and GPIO7 active-low factory reset as the recovery path.
+Supersedence note:
+  - The original fixed SSID `b06_hil_setup` is superseded by the 2026-06-23
+    dynamic SSID decision: `HIL-<board_number_2_digits>-<last_4_softap_mac_hex>`.
+Context: The product needs user-entered WiFi credentials without serial tooling.
+  The existing display/QR architecture already supports `http://IPv4` setup QR
+  payloads but forbids display/network coupling. The provisioning architecture
+  must use that path without making display components observe WiFi state.
+Alternatives considered:
+  - WPA2 provisioning AP password — rejected for v1; user selected open AP.
+  - Per-device provisioning password — deferred; requires manufacturing identity
+    and label/serial policy.
+  - Captive DNS portal — rejected for v1; user selected direct root URL/QR.
+  - Encrypted NVS from v1 — rejected for v1 simplicity; normal NVS accepted.
+  - Automatic AP fallback after saved credential boot failure — rejected; user
+    selected disconnected-until-factory-reset behavior.
+  - Web reset/change credentials UI — rejected for v1; GPIO7 factory reset is the
+    recovery path.
+Implementation contract:
+  - docs/wifi_provisioning_architecture.md is normative.
+  - components/wifi_credentials/ owns namespace `wifi_prov` and keys `ssid`,
+    `password`, and `provisioned`.
+  - components/wifi_provisioning/ owns SoftAP, HTTP server, `/` and `/provision`,
+    bounded form parsing, and STA connection attempts.
+  - wifi_provisioning exposes neutral provisioning events only; it must not
+    include app_core.h, display_controller.h, display headers, or know display
+    template identifiers.
+  - app_core owns boot orchestration and all display calls.
+  - Missing credentials or factory reset enter provisioning AP mode.
+  - Submitted credentials are saved only after successful STA connection.
+  - Saved credential failure at boot does not erase credentials and does not start
+    AP; recovery requires GPIO7 factory reset.
+  - Provisioning QR is `http://192.168.4.1` through
+    app_core_display_show_qr_setup after app_core maps a neutral provisioning event.
+Expected behavior:
+  - User joins open AP `HIL-06-<MAC4>` for this board, opens/scans `http://192.168.4.1/`,
+    submits SSID/password, sees success or failure, and can retry on failure.
+  - On success, AP/HTTP stop and device remains connected as STA.
+  - Reboot with valid saved credentials connects without opening AP.
+  - Holding GPIO7 active-low for 2000 ms at boot erases credentials and restarts
+    provisioning.
+Non-goals:
+  - Captive DNS, HTTPS, WPA2 provisioning AP, encrypted NVS requirement, web reset
+    UI, WiFi enterprise, automatic credential erase after boot failure, automatic
+    AP fallback after boot failure, app_core.h inclusion from wifi_provisioning,
+    or direct display/app_core display calls from WiFi provisioning.
+Consequences:
+  - v1 provisioning is easy to use but not private against nearby clients during
+    provisioning.
+  - Tester must validate the disconnected-until-reset failure path explicitly.
+  - Future security hardening requires a new architect handoff.
+Affected files:
+  - docs/wifi_provisioning_architecture.md
+  - docs/architecture.md
+  - docs/test_strategy.md
+  - docs/qr_encoder_interface.md
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/architect/decisions.md
+  - agent-workspaces/implementer/handoff.md
+Validation expectations:
+  - Tests in docs/test_strategy.md WiFi Provisioning Criteria section.
+  - Static audits confirm display tree excludes WiFi/network/provisioning headers
+    and wifi_provisioning excludes app_core.h, display_controller.h, and display
+    headers.
+Open questions:
+  - None.
+```
+
+## 2026-06-23 — WiFi Portal Reachability Corrective Contract
+
+```text
+Date: 2026-06-23
+Decision: Tighten the WiFi provisioning SoftAP/HTTP startup contract after Runs
+  007-009: configure AP IP/DHCP before WiFi start, never restart DHCP after AP
+  start, clear AP-start event bits before esp_wifi_start, add /health and stable
+  diagnostics, and forbid reboot loops on recoverable provisioning startup errors.
+Context:
+  - Run 007: phone joined AP but GET / returned blank page and no handler log.
+  - Run 008: implementer fix cleared WIFI_AP_STARTED_BIT after esp_wifi_start,
+    losing the AP_START event and causing timeout/reboot loop.
+  - Run 009: SoftAP and HTTP logged ready, phone joined AP, but still 0x GET /
+    handler entries. AP association alone is not sufficient evidence of portal
+    reachability.
+Alternatives considered:
+  - Ask implementer to continue ad hoc debugging — rejected; prior attempts
+    produced a race regression and still missed L3/httpd evidence.
+  - Add captive DNS — rejected as out of v1 scope and not a fix for direct
+    http://192.168.4.1 reachability.
+  - Treat blank page as HTML rendering — rejected by evidence: handler was never
+    invoked.
+Implementation contract:
+  - docs/wifi_provisioning_architecture.md sections Corrective Architecture From
+    Runs 007-009 and ESP-IDF SoftAP Portal Startup Contract are normative.
+  - AP netif IP/DHCP setup happens before esp_wifi_start.
+  - DHCP is not stopped/restarted after WIFI_EVENT_AP_START during portal startup.
+  - WIFI_AP_STARTED_BIT is cleared immediately before esp_wifi_start, never after.
+  - HTTP server starts only after AP_START succeeds.
+  - GET /health is a required plaintext reachability route.
+  - Portal ready log is emitted only after AP IP, AP start, HTTP start, and route
+    registration all succeed.
+  - Provisioning startup errors return to app_core without ESP_ERROR_CHECK aborts.
+Expected behavior:
+  - A phone associated to b06_hil_setup can load /health and /.
+  - Serial evidence distinguishes AP association, HTTP reachability, and HTML
+    rendering failures.
+  - SoftAP/HTTP failures leave firmware stable for logs and OLED error display.
+Non-goals:
+  - Captive DNS, HTTPS, AP password, web reset, changing QR profile, or widening
+    WiFi/display dependencies.
+Consequences:
+  - Implementer must provide a deterministic startup log sequence before asking
+    tester to retry.
+  - Tester can reject any build where /health fails or handler logs are absent.
+Affected files:
+  - docs/wifi_provisioning_architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/architect/decisions.md
+  - agent-workspaces/implementer/handoff.md
+Validation expectations:
+  - Tester Run 010 or next run records phone IP, /health result, / form result,
+    and serial handler logs.
+Open questions:
+  - None.
+```
+
+## 2026-06-23 — WiFi HTTP Handler Stack Safety
+
+```text
+Date: 2026-06-23
+Decision: WiFi provisioning HTTP handlers must not build large HTML/form buffers
+  on the HTTP worker stack. Setup and failure pages must use chunked/static or
+  otherwise bounded non-stack output, and httpd stack size must be explicitly
+  budgeted.
+Context:
+  - Run 010 fixed AP/DHCP/httpd reachability: phone got 192.168.4.2 and `GET /`
+    reached the handler.
+  - The device then crashed with stack protection fault in the httpd worker before
+    HTML reached the browser.
+  - Code review found `char html[2048]` in setup/failure page helpers and other
+    stack buffers in the handler call chain.
+Alternatives considered:
+  - Increase httpd stack only — insufficient alone because future page/form edits
+    could reintroduce large stack frames.
+  - Keep one big snprintf HTML buffer — rejected; it already matches observed
+    stack fault.
+  - Move to filesystem-hosted assets — rejected as out of v1 scope.
+Implementation contract:
+  - docs/wifi_provisioning_architecture.md HTTP Handler Stack Safety is normative.
+  - Every local array in HTTP handler synchronous call chains is <= 128 bytes.
+  - Setup/failure pages are streamed in chunks or use bounded non-stack storage.
+  - Form parsing avoids whole-body pair duplication on stack.
+  - httpd_config_t.stack_size is explicitly set to at least 8192 unless smaller is
+    proven safe by code review.
+  - Response-completion logs distinguish handler entry from successful response
+    delivery.
+Expected behavior:
+  - `/health`, `/`, and `/provision` responses complete without stack faults,
+    panics, aborts, or reboots.
+  - Tester sees both handler-entry and response-sent logs.
+Non-goals:
+  - JavaScript frontend, external assets, captive DNS, HTTPS, or UI redesign.
+Consequences:
+  - Implementer must treat memory layout of page rendering as acceptance-critical,
+    not an optimization detail.
+Affected files:
+  - docs/wifi_provisioning_architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/architect/decisions.md
+  - agent-workspaces/implementer/handoff.md
+Validation expectations:
+  - Tester next run confirms `/health` and `/` response-sent logs and no reboot.
+Open questions:
+  - None.
+```
+
+## 2026-06-23 — WiFi HTTP Request Header Budget
+
+```text
+Date: 2026-06-23
+Decision: The WiFi provisioning portal must set
+  `CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048` in source-controlled `sdkconfig.defaults`
+  so common phone browsers can submit `POST /provision` without ESP-IDF httpd
+  rejecting the request with HTTP 431 before application handler entry.
+Context:
+  - Run 011 verified GET / delivery after the HTTP stack safety fix.
+  - Human operator confirmed the setup form was visible on the phone.
+  - Submitting SSID/password failed with "Header fields are too long".
+  - Serial logs showed `httpd_parse: parse_block: request URI/header too long`
+    and HTTP 431, with no `POST /provision from client` application log.
+  - Generated config had `CONFIG_HTTPD_MAX_REQ_HDR_LEN=512`.
+Alternatives considered:
+  - Keep 512 and tell tester to use a smaller client — rejected; product must work
+    with common phone browsers.
+  - Change the form to GET or put credentials in the URL — rejected because it
+    leaks credentials and violates the HTTP portal contract.
+  - Use JavaScript/fetch with custom headers — rejected because the v1 portal is
+    no-JavaScript and server-rendered.
+  - Raise to 1024 — possible but less robust; choose 2048 to cover normal mobile
+    browser header variance with modest memory cost.
+Implementation contract:
+  - docs/wifi_provisioning_architecture.md HTTP Request Header Budget is normative.
+  - `sdkconfig.defaults` contains `CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048`.
+  - `CONFIG_HTTPD_MAX_URI_LEN` may remain 512.
+  - POST acceptance requires `POST /provision from client` in serial logs.
+  - POST path must log parsed-form and STA-attempt milestones without passwords.
+Expected behavior:
+  - Phone browser POST reaches `provision_post_handler`.
+  - HTTP 431 / `request URI/header too long` does not occur for normal form submit.
+Non-goals:
+  - Captive DNS, JavaScript, changing form method, external assets, HTTPS, or UI
+    redesign.
+Consequences:
+  - Implementer must treat build-time httpd Kconfig as part of the portal
+    architecture, not an incidental generated setting.
+Affected files:
+  - docs/wifi_provisioning_architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/architect/decisions.md
+  - agent-workspaces/implementer/handoff.md
+  - agent-workspaces/implementer/backlog.md
+Validation expectations:
+  - Tester next run confirms no HTTP 431 and serial logs show POST handler entry.
+Open questions:
+  - None.
+```
+
+## 2026-06-23 — WiFi Submitted Success Commit Contract
+
+```text
+Date: 2026-06-23
+Decision: Submitted WiFi provisioning success is committed only after fresh
+  submitted STA `GOT_IP`, credential persistence, successful browser success-page
+  delivery, delayed AP/HTTP teardown scheduling, and neutral success event emission
+  in that order. OLED `WIFI OK` must be downstream of the web success response,
+  not earlier.
+Context:
+  - Run 012 fixed the HTTP 431 header limit and GET / remained stable.
+  - Human operator submitted credentials and saw no success or failure page.
+  - OLED displayed `WIFI OK`.
+  - The AP still appeared visible to the phone after submit.
+  - Reboot used saved credentials but STA authentication failed and no IP was logged.
+  - Existing code notes showed SUBMITTED_SUCCESS could be emitted before the HTTP
+    success response was sent.
+Alternatives considered:
+  - Treat OLED success and NVS persistence as sufficient — rejected because the
+    user-facing web flow failed and reboot STA failed.
+  - Stop AP/HTTP immediately after queuing success page — rejected because it can
+    drop the browser transport before visible feedback.
+  - Accept AP visibility after submit as success — rejected unless bounded by a
+    logged teardown grace window.
+Implementation contract:
+  - docs/wifi_provisioning_architecture.md Submitted Success Commit Contract is
+    normative.
+  - Each submitted attempt clears stale STA event bits and requires fresh
+    `STA got IP ip=<ipv4> source=submitted`.
+  - Credentials saved after submitted success are logged as
+    `credentials saved source=submitted`.
+  - `WIFI_PROV_EVENT_SUBMITTED_SUCCESS` occurs only after
+    `POST /provision success response sent`.
+  - Success response send failure after save triggers credential rollback/clear
+    and keeps AP/HTTP active.
+  - AP/HTTP teardown is deferred by 2000 ms and logged.
+Expected behavior:
+  - Browser shows success or failure page for every POST outcome.
+  - OLED success cannot contradict blank web feedback.
+  - Saved credentials connect on later STA-only boot and log
+    `STA got IP ip=<ipv4> source=saved`.
+Non-goals:
+  - Captive DNS, JavaScript, AP password, HTTPS, or automatic AP fallback after
+    saved-credential boot failure.
+Consequences:
+  - Implementer must treat web feedback, display feedback, persistence, teardown,
+    and reboot behavior as one transaction rather than independent side effects.
+Affected files:
+  - docs/wifi_provisioning_architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/architect/decisions.md
+  - agent-workspaces/implementer/handoff.md
+  - agent-workspaces/implementer/backlog.md
+Validation expectations:
+  - Tester next run records live serial during POST and reboot saved-credential
+    STA-only boot.
+Open questions:
+  - None.
+```
+
+## 2026-06-24 — WiFi Saved Boot Reliability Contract
+
+```text
+Date: 2026-06-24
+Decision: Intermittent saved-credential cold boot failure is not acceptable in v1.
+  Saved boot must use WPA2/WPA3/WPA3-SAE-compatible STA config and a bounded
+  application retry policy before entering locked disconnected state.
+Context:
+  - Run 013 POST success path passed: browser success page, AP teardown, OLED OK,
+    and ping to STA IP when connected.
+  - Same saved NVS credentials connected on boots 2 and 4 but failed on boots 1, 3,
+    and 5 with `WIFI_REASON_AUTH_FAIL` reason 202.
+  - Credentials are known good and signal is not the suspected cause.
+  - Current code uses one saved `esp_wifi_connect()` attempt after cold STA start.
+  - Current STA config sets `threshold.authmode = WIFI_AUTH_WPA2_PSK`, while the
+    successful bench connection negotiates WPA3-SAE.
+Alternatives considered:
+  - Accept "sometimes connects" as v1 behavior — rejected; users cannot rely on a
+    device that randomly shows HOLD RESET after valid provisioning.
+  - Restrict v1 to WPA2-only routers — rejected for current bench/product reality;
+    WPA3-SAE Personal must be supported.
+  - Reopen provisioning AP automatically after saved boot failure — rejected; this
+    conflicts with the selected product behavior and recovery remains factory reset.
+  - Depend only on ESP-IDF auto-reconnect — rejected unless bounded and surfaced
+    through application attempt logs.
+Implementation contract:
+  - docs/wifi_provisioning_architecture.md Saved Boot Reliability Contract is
+    normative.
+  - Saved boot uses max_attempts=5, per_attempt_timeout_ms=12000,
+    cold_start_settle_ms=1000, and backoff_ms=[0,1000,3000,5000,8000].
+  - STA config is compatible with WPA2-Personal, WPA2/WPA3 transition, and
+    WPA3-SAE Personal; PMF capable true, PMF required false for v1 transition
+    compatibility.
+  - Final `WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED` is emitted only after all saved
+    attempts fail.
+Expected behavior:
+  - Known-good saved credentials connect reliably across cold boots.
+  - Early auth failures can be recovered by retry before user-visible locked
+    failure.
+Non-goals:
+  - Enterprise WiFi, captive upstream portals, automatic AP fallback, credential
+    erase on saved failure, HTTPS, or AP password changes.
+Consequences:
+  - Test acceptance changes from one successful reboot to a 10-consecutive-cold-boot
+    reliability sweep.
+Affected files:
+  - docs/wifi_provisioning_architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/architect/decisions.md
+  - agent-workspaces/implementer/handoff.md
+  - agent-workspaces/implementer/backlog.md
+Validation expectations:
+  - Tester next run records 10 consecutive saved-credential cold boots with final
+    PASS/FAIL and per-attempt logs.
+Open questions:
+  - None.
+```
+
+## 2026-06-23 — Product Boot Display Demo Retirement and Dynamic AP SSID
+
+```text
+Date: 2026-06-23
+Decision: Normal product firmware must not run historical display demo/test
+  screens at boot, and the WiFi provisioning AP SSID must be generated as
+  `HIL-<board_number_2_digits>-<last_4_softap_mac_hex>`.
+Context:
+  - The OLED visual demo (`QR_SETUP`, `TEXT ONLY`, `DEMO_STEP`) has already served
+    its validation purpose.
+  - Product boot should show only real product states, not test demo content.
+  - The old fixed AP SSID `b06_hil_setup` does not identify the physical device
+    instance and does not generalize cleanly to sibling board projects.
+Implementation contract:
+  - docs/display_visual_demo_protocol.md is retired from normal product firmware.
+  - `app_core_start()` must not call visual demo or smoke demo helpers.
+  - `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` is removed from `sdkconfig.defaults`.
+  - The board component owns the two-digit board number. For project `b06_hil`,
+    the value is `06`; future `bNN_hil` projects use `NN`.
+  - `wifi_provisioning` consumes the board-provided value and generates
+    `HIL-06-ABCD` style SSIDs using the last two bytes of the SoftAP MAC.
+  - The portal URL remains `http://192.168.4.1/`.
+Expected behavior:
+  - Fresh provisioning AP appears as `HIL-06-[0-9A-F]{4}`.
+  - Normal product boot emits no `DEMO_STEP` logs and shows no demo-only QR/text.
+  - Real WiFi provisioning display QR/status remains available.
+Non-goals:
+  - AP password, captive DNS, HTTPS, UI redesign, or removal of QR provisioning
+    product behavior.
+Consequences:
+  - Test records should stop treating the visual demo as mandatory for ordinary
+    display or WiFi work.
+Affected files:
+  - docs/display_visual_demo_protocol.md
+  - docs/wifi_provisioning_architecture.md
+  - docs/architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/architect/decisions.md
+  - agent-workspaces/implementer/handoff.md
+  - agent-workspaces/implementer/backlog.md
+Validation expectations:
+  - Tester confirms AP name pattern and absence of demo logs/screens on fresh boot.
+Open questions:
+  - None.
+```
+
 ## 2026-06-20 — Portable I2C Bus Contract
 
 ```text
@@ -526,6 +928,10 @@ Open questions:
 ```text
 Date: 2026-06-20
 Decision: Boot-time OLED demo-test gated by CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO.
+Supersedence note:
+  - This decision is superseded for normal product firmware by the 2026-06-23
+    Product Boot Display Demo Retirement and Dynamic AP SSID decision. The demo
+    remains historical validation evidence only.
 Context: Display work was validated on host and serial but QR hardware scan and
   per-step human observation were not repeatable. Tester Run 005 noted the gap.
 Implementation contract:
@@ -617,6 +1023,87 @@ Affected files:
   - agent-workspaces/architect/handoff.md
 Validation expectations:
   - Architect cites mission pillar when asked to code to "finish the task".
+Open questions:
+  - None.
+```
+
+## 2026-06-23 — OLED Provisioning Setup UX (SSID on screen)
+
+```text
+Date: 2026-06-23
+Decision: When no WiFi credentials are saved, the provisioning OLED screen uses
+  QR-left + four-line right panel: numbered join/scan instructions and the SoftAP
+  SSID split as prefix (7 chars) + suffix (remainder).
+Context: Dynamic AP SSID HIL-06-MAC4 was generated but not shown on OLED; users
+  saw only WIFI/SETUP beside the portal QR. The 64×64 right panel fits ~10
+  SMALL glyphs per line; an 11-char SSID truncates if placed on one line.
+Alternatives considered:
+  - Single-line SSID: rejected (truncates unique MAC suffix).
+  - WiFi join QR on right: rejected (two-QR ambiguity; user requested AP name text).
+  - Unnumbered JOIN / SCAN QR: rejected (sequence join-then-scan less obvious).
+  - OPEN password hint line: rejected (costs a line; AP is always open in v1).
+Implementation contract:
+  - wifi_provisioning passes s_ap_ssid on AP_STARTED and PORTAL_READY events.
+  - app_core_wifi builds lines: "1 JOIN", ssid[0..6], ssid[7..], "2 SCAN QR".
+  - PROV_SETUP_SSID_PREFIX_LEN = 7 fixed for HIL-NN-MAC4 format.
+  - Fallback WIFI/SETUP when ssid NULL or strlen < 8.
+  - QR payload unchanged: http://192.168.4.1.
+Expected behavior:
+  - User reads SSID from OLED, joins AP on phone, scans QR, opens portal.
+Non-goals:
+  - Spanish strings, dual QR, layout template changes.
+Consequences:
+  - PRODUCT_BOOT_DISPLAY_AND_DYNAMIC_AP_SSID display strings superseded for
+    provisioning setup path only.
+Affected files:
+  - docs/wifi_provisioning_architecture.md
+  - docs/display_delivery_contract.md
+  - docs/oled_text_display_interface.md
+  - agent-workspaces/architect/handoff.md (OLED_PROVISIONING_SETUP_UX)
+  - components/wifi_provisioning/wifi_provisioning.c (implementer)
+  - components/app_core/app_core_wifi.c (implementer)
+Open questions:
+  - None.
+```
+
+## 2026-06-23 — OLED WiFi Connected Status (IP + MAC)
+
+```text
+Date: 2026-06-23
+Decision: On STA success (SUBMITTED_SUCCESS and SAVED_SUCCESS), show FULL_FOUR_LINES:
+  WIFI OK / IPv4 / MAC bytes 0-2 / MAC bytes 3-5. Extend wifi_prov_event_info_t
+  with sta_ipv4 and sta_mac supplied by wifi_provisioning; app_core splits MAC only.
+Context: WIFI/OK gives no network identity. Full MAC (17 chars) fits one line at
+  SMALL but split XX:XX:XX groups match human reading habits; IP alone on its line
+  is immediately scannable.
+Alternatives considered:
+  - WIFI + OK on two lines: rejected (wastes a line; need IP + MAC).
+  - Single-line MAC AA:BB:CC:DD:EE:FF: acceptable fit but dense; split preferred.
+  - app_core reads esp_netif directly: rejected (couples app_core to WiFi stack).
+  - Labels IP:/MAC: on separate lines: rejected (costs lines without clarity gain).
+Implementation contract:
+  - wifi_prov_event_info_t gains sta_ipv4, sta_mac (success events only).
+  - wifi_provisioning caches IP on GOT_IP, formats MAC on success emit.
+  - app_core show_wifi_connected_display: lines WIFI OK, sta_ipv4, mac[0..7], mac[9..].
+  - WIFI_OK_MAC_PREFIX_LEN=8, WIFI_OK_MAC_SUFFIX_OFFSET=9.
+  - Fallback FULL_TWO_LINES WIFI/OK if payload incomplete.
+Expected behavior:
+  - Screen persists until next display event; shown on provision success and saved boot.
+Non-goals:
+  - IPv6, AP MAC, QR, auto-clear, Spanish strings.
+Consequences:
+  - SUBMITTED_SUCCESS display changes from WIFI/OK to four-line detail.
+  - SAVED_SUCCESS gains a display (was no-op).
+Affected files:
+  - docs/wifi_provisioning_architecture.md
+  - docs/display_delivery_contract.md
+  - docs/oled_text_display_interface.md
+  - agent-workspaces/architect/handoff.md (OLED_WIFI_CONNECTED_STATUS)
+  - components/wifi_provisioning/include/wifi_provisioning.h (implementer)
+  - components/wifi_provisioning/wifi_provisioning.c (implementer)
+  - components/app_core/app_core_wifi.c (implementer)
+Validation expectations:
+  - Tester: OLED IP/MAC match router DHCP and device STA MAC after provision and reboot.
 Open questions:
   - None.
 ```

@@ -12,5 +12,5 @@ idf_component_register(
         "display_geometry_test.c"
     INCLUDE_DIRS "include"
     REQUIRES esp_timer freertos
-    PRIV_REQUIRES i2c_bus
+    PRIV_REQUIRES i2c_bus qr_encoder setup_url
 )

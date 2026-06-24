@@ -1,5 +1,6 @@
 #include "app_core.h"
 
+#include "app_core_wifi.h"
 #include "board_pins.h"
 #include "display.h"
 #include "display_controller.h"
@@ -7,6 +8,7 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "i2c_bus.h"
+#include "setup_url.h"
 
 static const char *TAG = "app_core";
 
@@ -58,13 +60,32 @@ void app_core_start(void)
     ESP_ERROR_CHECK(i2c_bus_init(&bus_config));
 
     ESP_ERROR_CHECK(display_geometry_self_test());
+    ESP_ERROR_CHECK(setup_url_self_test());
 
     display_config_t cfg = DISPLAY_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(resolve_oled_config(&cfg));
     ESP_ERROR_CHECK(display_start(&cfg));
     ESP_ERROR_CHECK(display_controller_init());
 
-    const char *demo_lines[] = {"b06_hil", "READY", "v0.1", ""};
-    ESP_ERROR_CHECK(display_controller_show_template(DISPLAY_TEMPLATE_FULL_FOUR_LINES, demo_lines,
-                                                     4));
+    esp_err_t wifi_err = app_core_wifi_start();
+    if (wifi_err != ESP_OK) {
+        ESP_LOGW(TAG, "WiFi startup failed: %s", esp_err_to_name(wifi_err));
+    }
+}
+
+esp_err_t app_core_display_show_template(display_layout_template_t template_id,
+                                         const char *const *lines, size_t line_count)
+{
+    return display_controller_show_template(template_id, lines, line_count);
+}
+
+esp_err_t app_core_display_show_qr_setup(const char *url, const char *const *text_lines,
+                                         size_t text_line_count)
+{
+    if (!setup_url_validate(url)) {
+        ESP_LOGE(TAG, "invalid QR setup URL");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    return display_controller_show_qr_setup(url, text_lines, text_line_count);
 }

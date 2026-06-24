@@ -122,8 +122,11 @@ Rationale:
 
 Normative rules:
 
-- Instruction sources invoke `app_core` entry points such as
+- Display-aware instruction sources invoke `app_core` entry points such as
   `app_core_display_show_template(...)` and `app_core_display_show_qr_setup(...)`.
+- WiFi provisioning is intentionally more decoupled: it emits neutral
+  `wifi_prov_event_t` events to `app_core` and MUST NOT include `app_core.h`,
+  `display_controller.h`, or display headers.
 - Calls MUST occur from **FreeRTOS task context**, not from an ISR.
 - Optional hook registration is allowed when a separate component must notify
   `app_core`, but the handler implementation still lives in `app_core`.
@@ -148,8 +151,11 @@ Each function validates input as needed, then calls the matching
 Implementation note:
 
 - `app_core.h` currently exposes `display_layout_template_t`, so it includes
-  `display_controller.h` to get that type. Instruction sources MUST include
-  `app_core.h`; they MUST NOT directly include `display_controller.h`.
+  `display_controller.h` to get that type. Display-aware instruction sources MAY
+  include `app_core.h`; they MUST NOT directly include `display_controller.h`.
+- Components that should remain display-independent, including
+  `wifi_provisioning`, MUST NOT include `app_core.h`; they must report neutral
+  domain events to `app_core` instead.
 - Moving template IDs to a neutral header is a future refactor and requires a
   new architect handoff. Do not invent a second public enum in v1.
 
@@ -171,6 +177,73 @@ When the instruction type is QR:
   builds the layout from the payload it receives.
 
 `setup_url` validates **string shape only**. It does not imply a network origin.
+
+### Product provisioning QR setup (normative)
+
+Handoff: `OLED_PROVISIONING_SETUP_UX`. Full event and SSID-split rules live in
+`docs/wifi_provisioning_architecture.md` **Provisioning setup OLED screen**.
+
+Trigger: `app_core` receives `WIFI_PROV_EVENT_AP_STARTED` or
+`WIFI_PROV_EVENT_PORTAL_READY` with `info->setup_url` and `info->ssid` set.
+
+Call:
+
+```c
+app_core_display_show_qr_setup(info->setup_url, lines, line_count);
+```
+
+| Field | Value |
+| --- | --- |
+| `url` | `info->setup_url` if non-NULL, else `"http://192.168.4.1"` |
+| `text_lines[0]` | `"1 JOIN"` |
+| `text_lines[1]` | first 7 characters of `info->ssid` |
+| `text_lines[2]` | `info->ssid + 7` (remainder) |
+| `text_lines[3]` | `"2 SCAN QR"` |
+| `text_line_count` | `4` |
+
+Fallback when `info->ssid == NULL` or `strlen(info->ssid) < 8`:
+
+```c
+const char *fallback[] = { "WIFI", "SETUP" };
+app_core_display_show_qr_setup(url, fallback, 2);
+```
+
+Implementer MUST NOT add new public APIs for this screen. All logic stays in
+`app_core_wifi.c` as a static helper plus the existing event callback.
+
+### Product WiFi connected screen (normative)
+
+Handoff: `OLED_WIFI_CONNECTED_STATUS`. Full rules in
+`docs/wifi_provisioning_architecture.md` **WiFi connected OLED screen**.
+
+Trigger: `app_core` receives `WIFI_PROV_EVENT_SUBMITTED_SUCCESS` or
+`WIFI_PROV_EVENT_SAVED_SUCCESS` with `info->sta_ipv4` and `info->sta_mac` set.
+
+Call:
+
+```c
+app_core_display_show_template(DISPLAY_TEMPLATE_FULL_FOUR_LINES, lines, 4);
+```
+
+| Line | Source |
+| --- | --- |
+| 0 | `"WIFI OK"` (fixed) |
+| 1 | `info->sta_ipv4` (dotted quad, max 15 chars) |
+| 2 | `info->sta_mac[0..7]` → `"AA:BB:CC"` |
+| 3 | `info->sta_mac[9..16]` → `"DD:EE:FF"` |
+
+MAC split constants: `WIFI_OK_MAC_PREFIX_LEN = 8`,
+`WIFI_OK_MAC_SUFFIX_OFFSET = 9` (skip colon at index 8 of full MAC string).
+
+Fallback when `sta_ipv4 == NULL`, `sta_mac == NULL`, or `strlen(sta_mac) != 17`:
+
+```c
+const char *fallback[] = { "WIFI", "OK" };
+app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, fallback, 2);
+```
+
+`app_core` MUST NOT call `esp_netif_*` or `esp_wifi_*` to obtain IP/MAC for this
+screen; values arrive only through `wifi_prov_event_info_t`.
 
 ## `app_core` → `DisplayController` Direct Calls
 
@@ -209,9 +282,12 @@ Enforcement:
 - Direct `display_controller.h` includes are allowed only inside
   `components/app_core/` and display component internals in v1 unless a future
   handoff widens callers.
-- Components outside `app_core` MUST include `app_core.h` for display requests,
-  not `display_controller.h`. Indirect inclusion through `app_core.h` does not
-  authorize calling `display_controller_*`.
+- Components outside `app_core` that intentionally request display output MAY
+  include `app_core.h` for display requests, not `display_controller.h`. Indirect
+  inclusion through `app_core.h` does not authorize calling `display_controller_*`.
+- Components that are architecturally display-independent, such as
+  `wifi_provisioning`, MUST NOT include `app_core.h`; `app_core` must adapt their
+  neutral events to display requests.
 
 ## Threading and Ordering
 

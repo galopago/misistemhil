@@ -1,38 +1,51 @@
 # Display Visual Demo Protocol
 
-Human-in-the-loop visual validation for the HIL bench OLED. This is **not** a
-product UX feature; it is a repeatable demo-test so the tester and a human
-operator can confirm what appears on the physical panel after display-related
-work.
+Human-in-the-loop visual validation for the HIL bench OLED.
+
+**Status: retired from normal firmware builds.** This document remains as a
+historical record of the demo-test that validated the display stack. It is not a
+product UX feature and must not be wired into boot/runtime display calls for the
+WiFi provisioning firmware.
 
 Source handoff: `agent-workspaces/architect/handoff.md`,
 `DISPLAY_VISUAL_DEMO_PROTOCOL`.
 
 ## Purpose
 
-- Give the tester a **short, documented boot sequence** to observe on the OLED.
-- Tie serial log markers to each step so evidence is grep-friendly.
-- Separate **human observation** (what the operator sees) from **technical
-  conclusion** (PASS/FAIL/BLOCKED) in tester records.
+- Preserve the historical display demo acceptance record from Run 006.
+- Make explicit that the QR demo, text-only demo, and cycling visual steps must
+  not be called by product boot code.
+- Provide guardrails for future temporary display demos if a human explicitly
+  authorizes a new isolated test-only handoff.
 
-## Scope
+## Current Product Rule
 
-Mandatory when a handoff touches any of:
+Normal firmware MUST NOT call the historical demo helpers or cycle through test
+screens such as QR setup demo, `TEXT ONLY`, or generic layout exercises.
 
-- Display rendering, layouts, or templates.
-- QR encoding or `display_qr`.
-- `app_core` display delivery (`app_core_display_show_*`).
+Required product behavior:
 
-If the handoff does not touch the display, no demo manifest is required.
+- Display calls must be caused by real product state only, such as boot status,
+  WiFi provisioning QR/status, WiFi success/failure, or future product features.
+- `app_core_start()` must not call `app_core_run_visual_demo()` or
+  `app_core_run_display_smoke()`.
+- `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` must not be used to enable boot-time demo
+  display behavior in product firmware.
+- Demo-only payloads such as `http://192.168.4.1` QR demo, `SCAN` / `ME`,
+  `TEXT` / `ONLY`, and `DEMO_STEP` serial markers must not appear in normal boot
+  logs.
+- Historical demo source files may be deleted or left unreachable only if no
+  product code, CMake target, Kconfig default, or handoff requires them.
+
+If a future display investigation needs a demo again, it requires a new explicit
+architect handoff with test-only scope, authorized files, activation mechanism,
+and removal criteria.
 
 ## Activation (Kconfig)
 
-| Symbol | Default (HIL) | Behavior |
-| --- | --- | --- |
-| `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` | `y` in `sdkconfig.defaults` | After display init, run the full demo sequence in `app_core_run_visual_demo()`. |
-| `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` | `n` | After display init, run **smoke only**: one `FULL_FOUR_LINES` screen (`b06_hil`, `READY`, `v0.1`, `""`). No step cycling. |
-
-Disable the Kconfig for builds that must not cycle layouts at boot.
+Retired. `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` must be removed from
+`sdkconfig.defaults`, and product firmware must build without depending on this
+symbol.
 
 ## Code location
 
@@ -44,8 +57,9 @@ Disable the Kconfig for builds that must not cycle layouts at boot.
 | Boot wiring | `app_core_start()` in `app_core.c` |
 | Kconfig | `components/app_core/Kconfig` |
 
-Only `app_core` calls `app_core_display_show_*` during the demo (same path as
-production delivery per `docs/display_delivery_contract.md`).
+These locations are historical. Implementers removing the demo should delete or
+disconnect these files and references so product builds no longer contain demo
+entry points.
 
 ## Serial log contract
 
@@ -70,7 +84,8 @@ DEMO_STEP i/N done
   and still emits the hold marker for the step. Tester records that step as
   `FAIL` unless the handoff explicitly allows it.
 
-The tester MAY grep serial output for `DEMO_STEP` to confirm order and timing.
+The tester now greps serial output for absence of `DEMO_STEP` in normal product
+boots.
 
 ## Step rules
 
@@ -81,9 +96,9 @@ The tester MAY grep serial output for `DEMO_STEP` to confirm order and timing.
 - Steps run on the calling task (typically `app_core_start` context); use
   `vTaskDelay` for holds.
 
-## Baseline v1 sequence (current firmware)
+## Historical baseline sequence
 
-When `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO=y`:
+Historical Run 006 sequence when `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO=y`:
 
 | Step | `name=` | API | Payload / lines | Hold (s) | Human expects on OLED |
 | --- | --- | --- | --- | --- | --- |
@@ -93,64 +108,46 @@ When `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO=y`:
 
 Total hold: 18 s (within 30 s limit).
 
-When Kconfig is `n`, `app_core_run_display_smoke()` shows only the same
-`FULL_FOUR_LINES` smoke screen (indefinite until next boot; no `DEMO_STEP`
-markers for the multi-step sequence).
+This is historical evidence only. Normal product firmware must not enable this
+sequence or the smoke-only fallback.
 
 ## Implementer obligations
 
-For every display-related handoff completion:
+For this retirement:
 
-1. Keep `app_core_display_demo.c` aligned with the **Demo Manifest** below.
-2. Add a `## Display Visual Demo` section to
-   `agent-workspaces/implementer/handoff.md` containing:
-   - Required Kconfig value (`CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO=y` unless
-     documented otherwise).
-   - Demo Manifest table (copy of current steps).
-   - Commands: `idf.py build`, `idf.py flash`, `idf.py monitor` (or equivalent).
-   - Estimated boot observation window (sum of holds + ~5 s margin).
-3. Do not set `Ready for tester: Yes` without a complete manifest.
-
-### Demo Manifest template (copy into implementer handoff)
-
-```text
-Handoff ID:
-Kconfig: CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO=y
-Total hold (s):
-Commands: idf.py build && idf.py flash && idf.py monitor
-
-Step | name= | API | Payload / lines | Hold (s) | Human expects on OLED
-1    |       |     |                 |          |
-2    |       |     |                 |          |
-...
-```
+1. Remove boot/runtime calls to `app_core_run_visual_demo()` and
+   `app_core_run_display_smoke()`.
+2. Remove demo source/header/Kconfig/CMake references if they are no longer used.
+3. Remove `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` from `sdkconfig.defaults`.
+4. Preserve real display APIs used by product state:
+   `app_core_display_show_template()` and `app_core_display_show_qr_setup()`.
+5. Do not remove QR generation or setup QR product behavior used by WiFi
+   provisioning.
 
 ## Tester procedure
 
-1. Confirm implementer handoff includes **Display Visual Demo** manifest.
-2. Verify `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` in `sdkconfig` or
-   `sdkconfig.defaults` (note value in test run).
-3. Build and flash firmware.
-4. Capture serial for **30–45 s** after reset.
-5. Human operator watches OLED during the boot window.
-6. For each manifest step, record in `agent-workspaces/tester/feedback.md`:
-   - Expected (from manifest)
-   - Observed (human words)
-   - Result: PASS | FAIL | BLOCKED
-7. Summarize in `agent-workspaces/tester/test_runs.md` with handoff ID and
-   Kconfig value.
+1. Build and flash firmware.
+2. Capture serial during normal product boot.
+3. Confirm no `DEMO_STEP` logs appear.
+4. Confirm no demo-only QR/text screen appears.
+5. Confirm real product display states still appear when product events request
+   them.
 
-If `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO=n`, mark the multi-step visual demo as
-**BLOCKED**; do not infer PASS from prior runs. Smoke-only (single four-line
-screen) may still be noted separately.
+For normal product boot after retirement:
+
+- No `DEMO_STEP` logs.
+- No QR demo appears unless WiFi provisioning is actually active and requests the
+  product setup QR.
+- No `TEXT ONLY` test screen appears.
+- Product WiFi/display status screens still work.
 
 ## Non-goals (v1)
 
 - Menus, buttons, or user input on the device.
 - Serial CLI to trigger or change demo steps on demand.
 - Automated camera OCR or image snapshot comparison.
-- Per-handoff demo variants without a firmware commit updating
-  `app_core_display_demo.c`.
+- Per-handoff demo variants without a new explicit architect handoff and removal
+  criteria.
 
 ## Related documents
 

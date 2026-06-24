@@ -127,11 +127,11 @@ A task is ready for the tester when:
 - It has implementation notes.
 - It includes verifiable acceptance criteria.
 - It leaves no hardware assumptions unmarked as `TODO(b06-hil):`.
-- If the handoff affects the display, the implementer handoff includes a
-  **Display Visual Demo** manifest per `docs/display_visual_demo_protocol.md`
-  and firmware with `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO` documented.
-  Architect may **specify** the manifest and Kconfig symbol in docs/handoff;
-  implementer **creates** the Kconfig file and source.
+- If the handoff affects the display, validation criteria must be explicit. The
+  historical **Display Visual Demo** is retired from normal product firmware and
+  is required only if a new architect handoff explicitly authorizes a temporary
+  test-only demo. Normal product display validation uses real product states and
+  must not require `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO`.
 
 A task is ready for the implementer only when the architect handoff is
 implementation-ready: expected files, module contracts, behavior, constraints,

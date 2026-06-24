@@ -22,6 +22,9 @@ extern "C" {
 #define BOARD_OLED_ADDRESS_0 0x3C
 #define BOARD_OLED_ADDRESS_1 0x3D
 
+/** Two-digit HIL board number for this project (`b06_hil` -> `06`). */
+#define BOARD_HIL_NUMBER_STRING "06"
+
 typedef struct {
     gpio_num_t status_led;
     gpio_num_t i2c_sda;

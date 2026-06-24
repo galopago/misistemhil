@@ -39,10 +39,12 @@ Wait for confirmation before crossing the boundary.
 ## Typical Tester Deliverables
 
 - Commands executed, environment notes, pass/fail result
+- Reusable host procedures in `procedures.md` (for example NVS credential erase)
 - Reproducible failure steps when validation fails
 - Clear separation between human observation and technical conclusion
-- For display work: per-step visual demo results in `feedback.md` per
-  `docs/display_visual_demo_protocol.md`; note `CONFIG_B06_HIL_DISPLAY_VISUAL_DEMO`
+- For display work: evidence for the product display states requested by the
+  active handoff. The historical visual demo is retired unless a new architect
+  handoff explicitly authorizes a temporary test-only demo.
 
 ## Typical Mistakes To Avoid
 

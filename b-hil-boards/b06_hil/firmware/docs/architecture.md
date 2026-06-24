@@ -19,21 +19,28 @@ Shared-document changes for the QR encoder are motivated by
 Shared-document changes for display delivery are motivated by
 `agent-workspaces/architect/handoff.md`, `DISPLAY_DELIVERY_CONTRACT`.
 
+Shared-document changes for WiFi provisioning are motivated by
+`agent-workspaces/architect/handoff.md`, `WIFI_PROVISIONING_ARCHITECTURE`.
+
 ## Layers
 
 ```mermaid
 flowchart TD
-    AppMain[main] --> AppCore[components/app_core]
-    InstructionSource[instruction source TBD] -->|"callback"| AppCore
-    AppCore --> Board[components/board]
-    AppCore --> I2cBus[components/i2c_bus]
-    AppCore --> I2cBroker[i2c_broker phase3]
-    AppCore --> DisplayController[display controller]
+    AppMain["main"] --> AppCore["components/app_core"]
+    InstructionSource["product instruction sources"] -->|"callback"| AppCore
+    AppCore --> Board["components/board"]
+    AppCore --> I2cBus["components/i2c_bus"]
+    AppCore --> I2cBroker["i2c_broker phase3"]
+    AppCore --> WifiCredentials["components/wifi_credentials"]
+    AppCore --> WifiProvisioning["components/wifi_provisioning"]
+    AppCore --> DisplayController["display controller"]
+    WifiCredentials --> Nvs["ESP-IDF NVS"]
+    WifiProvisioning --> EspWifi["ESP-IDF WiFi and HTTP"]
     Board --> I2cBus
-    DisplayController --> DisplayTask[display task]
-    DisplayTask --> DisplayRenderer[display renderer]
-    DisplayRenderer --> DisplayCanvas[canvas or framebuffer]
-    DisplayCanvas --> DisplayDriver[display driver]
+    DisplayController --> DisplayTask["display task"]
+    DisplayTask --> DisplayRenderer["display renderer"]
+    DisplayRenderer --> DisplayCanvas["canvas or framebuffer"]
+    DisplayCanvas --> DisplayDriver["display driver"]
     DisplayDriver --> I2cBroker
     I2cBroker --> I2cBus
     I2cBus --> EspIdf[ESP-IDF drivers]
@@ -44,17 +51,25 @@ flowchart TD
 - `main/`: ESP-IDF entry point. It must initialize and delegate.
 - `components/app_core/`: application orchestration, **sole caller of
   `display_controller_*` in v1**, public display facade
-  (`app_core_display_show_template`, `app_core_display_show_qr_setup`), boot
-  display smoke/visual demo owner, and main product rules. Display delivery is
-  defined in `docs/display_delivery_contract.md`.
+  (`app_core_display_show_template`, `app_core_display_show_qr_setup`), WiFi
+  provisioning startup decisions, and main product rules. Display delivery is
+  defined in `docs/display_delivery_contract.md`. Boot-time display demos are
+  retired from normal product firmware.
 - `components/board/`: pin map, board details, and abstractions specific to
-  `b06_hil`.
+  `b06_hil`, including the `GPIO7` active-low factory reset input.
 - `components/i2c_bus/`: generic shared I2C master bus and device-handle
   registration. Device protocol drivers consume handles from this layer. The
   portable contract, incremental concurrency phases, and ESP-IDF binding are
   defined in `docs/i2c_bus_architecture.md`.
 - `i2c_broker` (phase 3): optional priority queue that serializes I2C
   transactions from multiple application tasks before they reach `i2c_bus`.
+- `components/wifi_credentials/`: NVS-backed WiFi credential storage for the
+  provisioning profile. It owns namespace `wifi_prov` and the `ssid`,
+  `password`, and `provisioned` keys defined in
+  `docs/wifi_provisioning_architecture.md`.
+- `components/wifi_provisioning/`: SoftAP, HTTP portal, STA connection attempts,
+  and provisioning state transitions. The v1 product contract is defined in
+  `docs/wifi_provisioning_architecture.md`.
 - Display interface: conceptual visual stack for the 0.96 inch I2C OLED display.
   The visual contract is defined in `docs/oled_text_display_interface.md`.
   QR matrix generation is defined in `docs/qr_encoder_interface.md`. QR payload
@@ -97,6 +112,23 @@ flowchart TD
   user input in the architecture.
 - Display power saving (sleep, dim, panel off) is out of scope for v1; the product
   is occasional-use, not continuous 24/7 operation.
+- WiFi provisioning follows `docs/wifi_provisioning_architecture.md`: missing
+  credentials start an open AP named `HIL-06-<MAC4>` for this board at
+  `192.168.4.1`, `GET /` serves a credential form, `POST /provision` tests
+  credentials before saving, successful provisioning stops AP/HTTP, and failed
+  saved credentials at boot leave the device disconnected until factory reset.
+- The provisioning AP SSID uses `HIL-<board_number_2_digits>-<last_4_softap_mac>`.
+  The board number comes from the project identifier (`b06_hil` → `06`) through
+  board-owned configuration; `wifi_provisioning` must not hard-code `06`.
+- Normal NVS is accepted for v1 WiFi credentials. Do not claim the stored password
+  is encrypted unless a future security handoff changes the storage profile.
+- `GPIO7` active-low factory reset is the only v1 recovery path from saved but
+  failing WiFi credentials. Web reset, serial reset, automatic credential erase,
+  and automatic AP fallback after boot failure are out of scope.
+- WiFi provisioning may request QR/status screens only through `app_core` display
+  APIs after receiving neutral provisioning events. Display code must not include
+  WiFi, HTTP, or NVS credential-storage headers, and `wifi_provisioning` must not
+  include `app_core.h` or display headers.
 
 ## Display Delivery (v1)
 
@@ -126,9 +158,48 @@ Rules:
   `display_qr` adapter owns matrix generation and static buffers.
 - The display architecture MUST NOT reference or depend on WiFi, network stacks, or
   connectivity state. Any such subsystem is fully decoupled.
+- WiFi provisioning is a valid product instruction source for display requests
+  only through neutral events consumed by `app_core`; it must not include
+  `app_core.h`, call `app_core_display_show_*`, call `display_controller_*`, or
+  call display task APIs directly.
 
 Rejected for v1: direct producer → display calls, polling, multi-caller display
 access, separate QR delivery channel, display/network coupling.
+
+## WiFi Provisioning (v1)
+
+WiFi provisioning follows **`docs/wifi_provisioning_architecture.md`**.
+
+Summary:
+
+```text
+missing credentials or GPIO7 factory reset
+        --start-->
+open AP HIL-06-<MAC4> at 192.168.4.1
+        --GET / and POST /provision-->
+HTTP portal
+        --valid submitted credentials-->
+STA connection attempt
+        --success-->
+save NVS credentials, show success, stop AP/HTTP
+        --failure-->
+show failure, keep AP/HTTP for retry
+```
+
+Rules:
+
+- `app_core` owns the startup decision: factory reset, load credentials, start
+  provisioning, connect saved credentials, or remain disconnected after saved
+  credential failure.
+- `wifi_credentials` owns NVS namespace `wifi_prov`; WiFi provisioning code must
+  not scatter credential keys across unrelated modules.
+- `wifi_provisioning` owns SoftAP, STA attempts, HTTP routes, and form parsing.
+- `wifi_provisioning` emits neutral `wifi_prov_event_t` events only; `app_core`
+  maps those events to optional display templates or QR setup screens.
+- The provisioning AP is open in v1. AP password, captive DNS, HTTPS, web reset,
+  and encrypted NVS are non-goals until a future architect handoff.
+- The provisioning QR payload is exactly `http://192.168.4.1` and remains a
+  display instruction routed through `app_core`.
 
 ## Toolchain Environment
 

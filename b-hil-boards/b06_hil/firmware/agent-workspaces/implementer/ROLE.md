@@ -47,9 +47,9 @@ Wait for confirmation before crossing the boundary.
 - Code changes in authorized paths
 - Notes in `implementer/handoff.md`: modified files, commands run, open questions
 - Build result documented for the tester; not a substitute for tester sign-off
-- For display-related work: **Display Visual Demo** section with Demo Manifest
-  per `docs/display_visual_demo_protocol.md`; do not set `Ready for tester: Yes`
-  without it
+- For display-related work: document the product display states affected by the
+  active handoff. The historical **Display Visual Demo** is retired unless a
+  future architect handoff explicitly authorizes a temporary test-only demo.
 
 ## Typical Mistakes To Avoid
 

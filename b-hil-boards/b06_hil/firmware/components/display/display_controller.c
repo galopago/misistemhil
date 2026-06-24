@@ -41,9 +41,7 @@ esp_err_t display_controller_show_template(display_layout_template_t template_id
         display_layout_template_top_two_bottom_one(&s_controller_layout, lines, line_count);
         break;
     case DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT:
-        display_layout_template_qr_left_text_right(&s_controller_layout, "http://192.168.4.1", lines,
-                                                     line_count);
-        break;
+        return ESP_ERR_INVALID_ARG;
     default:
         return ESP_ERR_INVALID_ARG;
     }
