@@ -8,6 +8,117 @@ maintained in English.
 
 ## Entries
 
+### Entry 028 — Run 023 LAN mDNS discovery on openwrt-iot
+
+```text
+Date: 2026-06-29
+Person: Operator + tester serial capture + host avahi-resolve
+Context: Run 023 DEVICE_DISCOVERY_MDNS_V1; NVS erased; firmware 0xe8e60; network openwrt-iot
+Captures:
+  /tmp/b06_hil_boot_log_run023_portal.txt
+  /tmp/b06_hil_boot_log_run023_mdns.txt
+
+Portal boot (no home STA):
+  SoftAP HIL-06-24CE, portal ready; device_id: identity HIL-06-24CE logged;
+  no device_discovery: mdns start (PASS per spec).
+
+POST openwrt-iot (correct credentials):
+  STA got IP 192.168.1.9 source=submitted; credentials saved;
+  device_discovery: mdns start hostname=HIL-06-24CE immediately after success.
+
+LAN resolution (host on same 192.168.1.0/24 via ethernet):
+  avahi-resolve -n HIL-06-24CE.local → 192.168.1.9 (< 2 s after mdns start log)
+  ping HIL-06-24CE.local → 192.168.1.9 OK
+  IP matches serial STA got IP.
+
+Operator acceptance (2026-06-29, post-run):
+  Accepted DEVICE_DISCOVERY_MDNS_V1 core validation. ping HIL-06-24CE.local responds
+  with the device IPv4 (192.168.1.9) as expected.
+
+Classification: PASS — core LAN mDNS discovery v1 (operator-accepted).
+```
+
+### Entry 027 — Run 022 first-connect failure OLED flash + QR restore
+
+```text
+Date: 2026-06-29
+Person: Operator + tester serial capture
+Context: Run 022 WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2; NVS erased; firmware 0xde470
+Capture: /tmp/b06_hil_boot_log_run022_failure_flash.txt
+
+Boot OLED (Phase A):
+  QR left + right panel 1 JOIN / HIL-06- / 24CE / 2 SCAN QR — matches Run 016 layout.
+
+POST (openwrt-iot, deliberate wrong password):
+  Browser showed failure message (WiFi connection failed. Check SSID and password.) with retry form.
+  OLED sequence observed:
+    1. WIFI / CONNECTING (during STA attempt)
+    2. WIFI / FAILED (brief flash, ~3 s)
+    3. QR setup screen restored — same as boot (1 JOIN / HIL-06- / 24CE / 2 SCAN QR); no WIFI FAIL on QR panel.
+  Phone still connected to HIL-06-24CE after failure; portal reachable for retry.
+
+Operator confirmation (2026-06-29, post-run review):
+  Tests successful. OLED displayed the expected sequence in order: CONNECTING → FAILED (~3 s) →
+  standard QR setup restore. Matches normative UX v2 timeline in
+  docs/wifi_provisioning_first_connect_failure_ux_proposal.md.
+
+Classification: PASS — core UX v2 first-connect failure display behavior (operator-confirmed visual).
+```
+
+### Entry 026 — WiFi debug openwrt-iot POST success after AP reconfig
+
+```text
+Date: 2026-06-28
+Person: Operator + tester serial capture
+Context: openwrt-iot after OpenWrt encryption change (WPA2/WPA3 mixed per guidance)
+Capture: /tmp/b06_hil_wifi_debug_new_ap3.txt
+
+Sequence (full POST success):
+  I (752) wifi_prov: provisioning portal ready
+  I (16412) wifi_prov: POST /provision from client
+  I (16432) wifi_prov: POST /provision attempting STA ssid=openwrt-iot
+  I (17282) wifi:connected with openwrt-iot, channel 1, bssid=e4:f0:42:d5:f2:b8
+  I (18312) wifi_prov: STA got IP ip=192.168.1.9 source=submitted
+  I (18312) wifi_prov: credentials saved source=submitted
+  I (18322) wifi_prov: POST /provision success response sent
+  I (18322) wifi_prov: success teardown scheduled delay_ms=2000
+
+Prior failure (Entry 025): reason=211 AUTHMODE_THRESHOLD before AP fix.
+Classification: POST SUCCESS — openwrt-iot provisioning validated.
+```
+
+### Entry 025 — WiFi debug new AP POST openwrt-iot (full serial capture)
+
+```text
+Date: 2026-06-28
+Person: Tester + operator POST
+Context: Portal POST to new AP ssid=openwrt-iot (firmware 56a8095-dirty)
+Capture: /tmp/b06_hil_wifi_debug_new_ap2.txt (120s from boot reset)
+
+Sequence (PASS portal, FAIL STA):
+  I (722) wifi_prov: provisioning portal ready at http://192.168.4.1
+  I (21952) wifi_prov: POST /provision from client
+  I (21952) wifi_prov: POST /provision parsed form
+  I (21972) wifi_prov: STA config auth_profile=wpa2_wpa3_personal pmf_capable=true
+  I (21972) wifi_prov: POST /provision attempting STA ssid=openwrt-iot
+  W (24912) wifi_prov: STA disconnected reason=211 source=submitted
+  I (52082) wifi_prov: POST /provision failure response sent
+
+reason=211: WIFI_REASON_NO_AP_FOUND_IN_AUTHMODE_THRESHOLD (ESP-IDF 5.3)
+  AP seen in scan but security mode below firmware threshold.authmode=WIFI_AUTH_WPA2_WPA3_PSK
+
+Classification:
+  - POST FAIL — not password typo; auth mode / security profile mismatch
+  - Likely AP: open, WPA-Enterprise, WPA-only legacy, or incompatible personal mode
+
+Operator checklist for openwrt-iot:
+  - 2.4 GHz enabled (ESP32-C3 has no 5 GHz)
+  - WPA2-PSK or WPA3-SAE personal (not open, not enterprise)
+  - If AP is WPA2-only: may need implementer to lower threshold to WIFI_AUTH_WPA2_PSK
+
+Prior partial capture (new_ap.txt): only failure tail; superseded by this entry.
+```
+
 ### Entry 024 — Run 021 factory reset + reprovision vitriolina (operator confirmed)
 
 ```text

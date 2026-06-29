@@ -21,6 +21,9 @@ Shared-document changes for display delivery validation are motivated by
 Shared-document changes for WiFi provisioning validation are motivated by
 `agent-workspaces/architect/handoff.md`, `WIFI_PROVISIONING_ARCHITECTURE`.
 
+Shared-document changes for LAN mDNS discovery validation are motivated by
+`agent-workspaces/architect/handoff.md`, `DEVICE_DISCOVERY_MDNS_V1`.
+
 ## Levels
 
 - Build: `idf.py build`.
@@ -309,6 +312,39 @@ Validation follows `docs/wifi_provisioning_architecture.md`.
 - The failure page keeps the password field empty even after a failed submission.
 - Malformed form submissions return `400 Bad Request`; wrong WiFi credentials
   return the normal failure page and keep AP/HTTP active.
+
+### First-connect failure OLED and LED
+
+Applies when no credentials exist in NVS and `POST /provision` STA fails. Full
+flow: [`wifi_provisioning_first_connect_failure_flow.md`](wifi_provisioning_first_connect_failure_flow.md).
+UX v2: [`wifi_provisioning_first_connect_failure_ux_proposal.md`](wifi_provisioning_first_connect_failure_ux_proposal.md).
+
+- After valid form parse, OLED shows `WIFI` / `CONNECTING` on
+  `SUBMITTED_CONNECTING`.
+- After STA timeout or failure, OLED shows `WIFI` / `FAILED` on
+  `SUBMITTED_FAILURE`.
+- OLED MUST show `FAILED` for approximately `PROV_FAILURE_FLASH_MS` (3000 ms),
+  then restore the **standard** QR setup screen (`1 JOIN` / AP SSID / `2 SCAN QR`)
+  without modified QR copy.
+- Invalid form submissions MUST NOT change the OLED (no `SUBMITTED_*` events).
+- New POST during the flash MUST cancel the restore timer and show `CONNECTING`.
+- Error LED solid ON during portal (`UNPROVISIONED`) unless optional submitted
+  `CONNECTING` link_status is implemented.
+
+### LAN mDNS discovery
+
+Applies after STA obtains IPv4 on the user LAN. Spec:
+[`device_discovery_mdns_architecture.md`](device_discovery_mdns_architecture.md).
+
+- Serial logs include `device_id: identity HIL-06-XXXX` and
+  `device_discovery: mdns start hostname=HIL-06-XXXX` after connect success.
+- LAN client on same subnet resolves `HIL-06-XXXX.local` to device IPv4 within
+  ~30 s; IP matches serial `STA got IP` / OLED.
+- `XXXX` matches SoftAP SSID suffix from provisioning (SoftAP MAC4, not STA MAC).
+- Fresh NVS portal boot: no `mdns start` until STA connects to home network.
+- WiFi outage during runtime: `mdns stop reason=link_lost`; restart after GOT_IP.
+- Factory reset to portal: `mdns stop reason=factory_reset`.
+- v1: hostname-only; no requirement to browse `_http._tcp` or custom service types.
 
 ### Reboot and recovery
 

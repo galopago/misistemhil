@@ -16,7 +16,7 @@
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "wifi_credentials.h"
-#include "board_pins.h"
+#include "device_identity.h"
 
 static const char *TAG = "wifi_prov";
 
@@ -382,13 +382,9 @@ static esp_err_t ensure_sta_netif(void)
 
 static esp_err_t build_provisioning_ap_ssid(void)
 {
-    uint8_t mac[6] = {0};
-    ESP_RETURN_ON_ERROR(esp_wifi_get_mac(WIFI_IF_AP, mac), TAG, "get softap mac failed");
-
-    const int written = snprintf(s_ap_ssid, sizeof(s_ap_ssid), "HIL-%s-%02X%02X",
-                                 BOARD_HIL_NUMBER_STRING, mac[4], mac[5]);
-    if (written <= 0 || written >= (int)sizeof(s_ap_ssid)) {
-        return ESP_ERR_INVALID_SIZE;
+    const esp_err_t err = device_identity_get(s_ap_ssid, sizeof(s_ap_ssid));
+    if (err != ESP_OK) {
+        return err;
     }
 
     ESP_LOGI(TAG, "provisioning AP SSID generated ssid=%s", s_ap_ssid);

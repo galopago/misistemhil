@@ -1365,3 +1365,68 @@ Affected files:
 Open questions:
   - None.
 ```
+
+---
+
+## 2026-06-28 — First-connect failure UX v2 (flash + QR restore)
+
+```text
+Date: 2026-06-28
+Decision: Approved Option A — brief WIFI / FAILED then unchanged QR setup restore.
+Context: Operator rejected failure-aware QR copy (WIFI FAIL on QR panel). Wants
+  clear failure moment without damaging standard provisioning screen.
+Consequences:
+  - 3 s PROV_FAILURE_FLASH_MS in app_core_wifi; cache portal context; timer restore.
+  - No new wifi_prov events; no wifi_provisioning.c changes for display UX.
+  - Option B (modified QR lines) withdrawn.
+Affected files:
+  - docs/wifi_provisioning_first_connect_failure_ux_proposal.md (approved spec)
+  - components/app_core/app_core_wifi.c (implementer pending)
+Open questions:
+  - None.
+```
+
+---
+
+## 2026-06-28 — First-connect failure flow documentation
+
+```text
+Date: 2026-06-28
+Decision: Publish standalone normative doc for portal first-connect failure path.
+Context: Consolidate scattered rules on OLED FAILED persistence, browser retry,
+  LED solid ON during submitted attempt, and single 30 s STA wait vs connect cycle.
+Consequences:
+  - docs/wifi_provisioning_first_connect_failure_flow.md is canonical for this path.
+  - SUBMITTED_FAILURE OLED MUST NOT auto-revert to QR (explicit in parent doc).
+  - LED/OLED asymmetry during SUBMITTED_CONNECTING documented as v1 accepted; no code change.
+Affected files:
+  - docs/wifi_provisioning_first_connect_failure_flow.md (new)
+  - docs/wifi_provisioning_architecture.md, docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md
+Open questions:
+  - None.
+```
+
+---
+
+## 2026-06-28 — LAN mDNS discovery (HIL hostname)
+
+```text
+Date: 2026-06-28
+Decision: mDNS hostname discovery when STA has IPv4; identity HIL-<board>-<MAC4>.
+Context: Variable DHCP IP; operator needs Bonjour-style resolution on user LAN.
+Human choices:
+  - STA with IP only (not SoftAP provisioning)
+  - Hostname → IPv4 only (no _http._tcp in v1)
+  - MAC4 from SoftAP MAC bytes 4-5 (matches OLED/QR SSID, not STA MAC)
+Consequences:
+  - docs/device_discovery_mdns_architecture.md is canonical
+  - New components device_identity + device_discovery; app_core_wifi orchestrates
+  - wifi_provisioning SSID via device_identity_get (dedupe format string)
+Affected files:
+  - docs/device_discovery_mdns_architecture.md (new)
+  - docs/architecture.md, docs/wifi_provisioning_architecture.md, docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md, implementer handoff (pending code)
+Open questions:
+  - OLED .local display deferred
+```

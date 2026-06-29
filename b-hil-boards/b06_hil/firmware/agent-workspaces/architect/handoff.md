@@ -35,6 +35,9 @@ Active handoffs:
 - `WIFI_RUNTIME_RECONNECT`
 - `WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2`
 - `WIFI_FACTORY_RESET_RUNTIME`
+- `WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_FLOW`
+- `WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2` (**approved** 2026-06-28 — implementer authorized)
+- `DEVICE_DISCOVERY_MDNS_V1`
 
 Pending architect review: none.
 
@@ -1727,6 +1730,129 @@ Acceptance criteria:
   - Decision recorded; no firmware changes in this execution.
 Validation plan:
   - Architect can state task is DONE when handoff/docs are complete without build.
+Open questions:
+  - None.
+```
+
+## WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_FLOW
+
+```text
+Role boundary check:
+  Documentation-only. No firmware changes required; as-built behavior matches spec.
+ID: WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_FLOW
+Date: 2026-06-28
+Objective:
+  Record normative end-to-end flow when first portal WiFi connection fails: events,
+  OLED/browser/LED surfaces, persistence rules, and contrast with saved-boot cycle.
+Reason:
+  Operator and tester questions on post-failure display behavior; scattered rules
+  needed a single implementation-ready reference.
+Authorized files:
+  - docs/wifi_provisioning_first_connect_failure_flow.md (new)
+  - docs/wifi_provisioning_architecture.md (cross-links, SUBMITTED_FAILURE persistence)
+  - docs/test_strategy.md (First-connect failure OLED and LED criteria)
+  - agent-workspaces/architect/handoff.md
+  - agent-workspaces/architect/decisions.md
+Expected changes:
+  - Standalone flow doc with sequence diagram, surface tables, failure variants.
+  - Parent doc link + SUBMITTED_FAILURE OLED persistence MUST.
+  - Tester criteria for CONNECTING/FAILED OLED, no auto QR, LED solid ON.
+Explicitly excluded (implementer):
+  - components/**, main/** — no code changes in this handoff
+  - LED/OLED alignment during SUBMITTED_CONNECTING (documented asymmetry; future opt-in)
+Module boundaries and contracts:
+  - wifi_provisioning emits neutral events; app_core owns display and LED.
+  - Submitted path: single 30 s STA wait; no connect cycle; no NVS on failure.
+Detailed behavior:
+  - See docs/wifi_provisioning_first_connect_failure_flow.md
+Non-goals:
+  - Change submitted-path link_status to CONNECTING for LED slow blink
+  - Auto-restore QR screen after SUBMITTED_FAILURE
+Acceptance criteria:
+  - Flow doc exists and is linked from wifi_provisioning_architecture.md
+  - test_strategy lists OLED/LED checks for first-connect failure
+  - Decision recorded in decisions.md
+  - No pending implementer tasks (behavior already as-built)
+Validation plan:
+  - Tester runs wrong-credential POST per test_strategy First-connect failure section
+Open questions:
+  - None.
+```
+
+## WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2
+
+```text
+Role boundary check:
+  Approved — implementer executes firmware + doc alignment.
+ID: WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2
+Date: 2026-06-28
+Status: APPROVED (human 2026-06-28)
+Objective:
+  After first portal STA failure: brief WIFI / FAILED flash, then auto-restore
+  unchanged standard QR setup screen.
+Reason:
+  Persistent FAILED hides QR guide; operator wants failure feedback without
+  modifying QR setup copy.
+Normative spec:
+  docs/wifi_provisioning_first_connect_failure_ux_proposal.md
+Approved scope:
+  - SUBMITTED_FAILURE → FULL_TWO_LINES WIFI / FAILED for PROV_FAILURE_FLASH_MS (3000)
+  - Timer in app_core_wifi; on expiry restore show_provisioning_setup_display()
+    from cached AP_STARTED/PORTAL_READY context
+  - Cancel timer on SUBMITTED_CONNECTING
+  - No new wifi_prov events; no QR line copy changes
+  - Option B (WIFI FAIL on QR panel) WITHDRAWN
+Optional:
+  - CONNECTING link_status during submitted attempt (LED slow blink)
+Authorized files (implementer):
+  - components/app_core/app_core_wifi.c
+  - docs/wifi_provisioning_architecture.md, docs/test_strategy.md,
+    docs/wifi_provisioning_first_connect_failure_flow.md
+Acceptance criteria:
+  - See proposal doc § Acceptance criteria
+Open questions:
+  - None.
+```
+
+## DEVICE_DISCOVERY_MDNS_V1
+
+```text
+Role boundary check:
+  Architecture and documentation. Implementer owns components/ and sdkconfig.
+ID: DEVICE_DISCOVERY_MDNS_V1
+Date: 2026-06-28
+Status: APPROVED — implementer authorized
+Objective:
+  LAN hostname discovery via mDNS: HIL-<board>-<MAC4>.local when STA has IPv4;
+  same identity string as SoftAP SSID / OLED / QR.
+Reason:
+  DHCP IP varies; operators need Bonjour-style name resolution on the user LAN.
+Human decisions (2026-06-28):
+  - Announce STA with IP only (not during provisioning SoftAP)
+  - Hostname → IPv4 only (no DNS-SD service records in v1)
+  - Name matches product display; MAC4 from SoftAP MAC bytes 4-5
+Normative spec:
+  docs/device_discovery_mdns_architecture.md
+Authorized files (implementer):
+  - components/device_identity/ (new)
+  - components/device_discovery/ (new, REQUIRES mdns)
+  - components/wifi_provisioning/wifi_provisioning.c (SSID → device_identity)
+  - components/app_core/app_core_wifi.c (start/stop lifecycle)
+  - components/app_core/CMakeLists.txt
+  - sdkconfig.defaults (mdns component)
+Module boundaries:
+  - device_identity: HIL-NN-XXXX string only
+  - device_discovery: mdns init/start/stop; no WiFi connect
+  - app_core_wifi: orchestration from wifi_prov events + link_status
+  - wifi_provisioning: no mdns.h
+Detailed behavior:
+  - See docs/device_discovery_mdns_architecture.md
+Non-goals:
+  - _http._tcp, _hil._tcp, TXT, OLED .local display, mDNS on SoftAP
+Acceptance criteria:
+  - See spec § Acceptance criteria and docs/test_strategy.md § LAN mDNS discovery
+Validation plan:
+  - Tester: resolve HIL-06-XXXX.local on LAN after provision/connect
 Open questions:
   - None.
 ```

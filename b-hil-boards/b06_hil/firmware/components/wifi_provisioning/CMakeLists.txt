@@ -4,5 +4,5 @@ idf_component_register(
         "wifi_provisioning_form.c"
         "wifi_provisioning_pages.c"
     INCLUDE_DIRS "include"
-    REQUIRES board esp_wifi esp_netif esp_event esp_http_server freertos wifi_credentials
+    REQUIRES device_identity esp_wifi esp_netif esp_event esp_http_server freertos wifi_credentials
 )

@@ -6,6 +6,17 @@ This document is the **normative architecture** for WiFi provisioning in the
 Source handoff: `agent-workspaces/architect/handoff.md`,
 `WIFI_PROVISIONING_ARCHITECTURE`.
 
+Related:
+
+- [`wifi_provisioning_first_connect_failure_flow.md`](wifi_provisioning_first_connect_failure_flow.md)
+  — first portal connect failure (OLED, browser, LED, no NVS)
+- [`wifi_provisioning_first_connect_failure_ux_proposal.md`](wifi_provisioning_first_connect_failure_ux_proposal.md)
+  — **approved** v2: 3 s FAILED flash then standard QR restore
+- [`wifi_connect_cycle_architecture.md`](wifi_connect_cycle_architecture.md) —
+  saved-credentials boot/runtime connect cycle
+- [`device_discovery_mdns_architecture.md`](device_discovery_mdns_architecture.md) —
+  LAN mDNS hostname (`HIL-<board>-<MAC4>.local`) when STA has IP
+
 ## Purpose
 
 Allow a user to connect to a temporary device-owned WiFi access point, open a
@@ -80,6 +91,11 @@ Rules:
 - The SSID MUST fit the 32-byte ESP-IDF SSID limit. `HIL-06-ABCD` is 11 bytes.
 - Logs and tester records must show the generated SSID, not the old fixed
   `b06_hil_setup` string.
+
+The SSID string MUST be built by `device_identity_get()` in
+`components/device_identity/` (shared with mDNS). `wifi_provisioning` MUST NOT
+duplicate the `HIL-%s-%02X%02X` format. mDNS lifecycle is out of scope for this
+module; see [`device_discovery_mdns_architecture.md`](device_discovery_mdns_architecture.md).
 
 ## Layer Model
 
@@ -1492,7 +1508,12 @@ idempotent and intentional.
 | `WIFI_PROV_EVENT_AP_STARTED` or `WIFI_PROV_EVENT_PORTAL_READY` | `app_core_display_show_qr_setup(setup_url, 4 lines per table above, 4)` or fallback 2 lines |
 | `WIFI_PROV_EVENT_SUBMITTED_CONNECTING` | `app_core_display_show_template(FULL_TWO_LINES, ["WIFI", "CONNECTING"], 2)` |
 | `WIFI_PROV_EVENT_SUBMITTED_SUCCESS` | Connected screen (4 lines: IP + MAC); see **WiFi connected OLED screen** |
-| `WIFI_PROV_EVENT_SUBMITTED_FAILURE` | `app_core_display_show_template(FULL_TWO_LINES, ["WIFI", "FAILED"], 2)` |
+| `WIFI_PROV_EVENT_SUBMITTED_FAILURE` | `app_core_display_show_template(FULL_TWO_LINES, ["WIFI", "FAILED"], 2)` then auto-restore standard QR setup after `PROV_FAILURE_FLASH_MS` (3000 ms); see [`wifi_provisioning_first_connect_failure_ux_proposal.md`](wifi_provisioning_first_connect_failure_ux_proposal.md) |
+
+After `SUBMITTED_FAILURE`, the OLED MUST NOT remain on `WIFI / FAILED`
+indefinitely. `app_core_wifi` MUST cache portal context from `AP_STARTED` /
+`PORTAL_READY` and restore the **unchanged** QR setup screen when the failure
+flash timer expires.
 | `WIFI_PROV_EVENT_SAVED_SUCCESS` | Connected screen (same as `SUBMITTED_SUCCESS`) |
 | `WIFI_PROV_EVENT_CONNECT_CYCLE_ACTIVE` | `WIFI` / `CONNECTING` (v2) |
 | `WIFI_PROV_EVENT_CONNECT_ALERT_PHASE` | `WIFI` / `CONNECTING` (v2; no HOLD RESET) |

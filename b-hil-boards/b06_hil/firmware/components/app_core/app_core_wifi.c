@@ -2,6 +2,7 @@
 
 #include "app_core.h"
 #include "board_pins.h"
+#include "device_discovery.h"
 #include "display_types.h"
 #include "wifi_credentials.h"
 #include "wifi_provisioning.h"
@@ -11,6 +12,7 @@
 #include "driver/gpio.h"
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -27,8 +29,16 @@ static const char *TAG = "app_core_wifi";
 #define WIFI_OK_LINE_STATUS "WIFI OK"
 #define WIFI_OK_MAC_PREFIX_LEN 8
 #define WIFI_OK_MAC_SUFFIX_OFFSET 9
+#define PROV_FAILURE_FLASH_MS 3000U
+#define PROV_SETUP_URL_MAX_LEN 32U
+#define PROV_AP_SSID_MAX_LEN 33U
 
 static bool s_wifi_started = false;
+static wifi_link_status_t s_last_link_status = WIFI_LINK_STATUS_UNPROVISIONED;
+static char s_cached_setup_url[PROV_SETUP_URL_MAX_LEN];
+static char s_cached_ap_ssid[PROV_AP_SSID_MAX_LEN];
+static bool s_portal_display_cached = false;
+static esp_timer_handle_t s_prov_failure_restore_timer = NULL;
 
 static void apply_wifi_link_status_led(wifi_link_status_t status)
 {
@@ -98,6 +108,101 @@ static void show_provisioning_setup_display(const wifi_prov_event_info_t *info)
     (void)app_core_display_show_qr_setup(url, lines, 4);
 }
 
+static void cache_portal_display_context(const wifi_prov_event_info_t *info)
+{
+    if (info == NULL) {
+        return;
+    }
+
+    const char *url =
+        info->setup_url != NULL ? info->setup_url : PROV_SETUP_FALLBACK_URL;
+    strncpy(s_cached_setup_url, url, sizeof(s_cached_setup_url) - 1U);
+    s_cached_setup_url[sizeof(s_cached_setup_url) - 1U] = '\0';
+
+    if (info->ssid != NULL && strlen(info->ssid) >= 8U) {
+        strncpy(s_cached_ap_ssid, info->ssid, sizeof(s_cached_ap_ssid) - 1U);
+        s_cached_ap_ssid[sizeof(s_cached_ap_ssid) - 1U] = '\0';
+        s_portal_display_cached = true;
+    }
+}
+
+static void restore_provisioning_setup_from_cache(void)
+{
+    if (!s_portal_display_cached || s_cached_setup_url[0] == '\0' ||
+        strlen(s_cached_ap_ssid) < 8U) {
+        const char *fallback[] = {"WIFI", "SETUP"};
+        (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, fallback, 2);
+        return;
+    }
+
+    const wifi_prov_event_info_t cached_info = {
+        .setup_url = s_cached_setup_url,
+        .ssid = s_cached_ap_ssid,
+    };
+    show_provisioning_setup_display(&cached_info);
+}
+
+static void prov_failure_restore_timer_cb(void *arg)
+{
+    (void)arg;
+    restore_provisioning_setup_from_cache();
+}
+
+static void cancel_provisioning_setup_restore(void)
+{
+    if (s_prov_failure_restore_timer != NULL) {
+        (void)esp_timer_stop(s_prov_failure_restore_timer);
+    }
+}
+
+static void schedule_provisioning_setup_restore(void)
+{
+    if (s_prov_failure_restore_timer == NULL) {
+        return;
+    }
+
+    cancel_provisioning_setup_restore();
+    (void)esp_timer_start_once(s_prov_failure_restore_timer,
+                                (uint64_t)PROV_FAILURE_FLASH_MS * 1000ULL);
+}
+
+static esp_err_t ensure_prov_failure_restore_timer(void)
+{
+    if (s_prov_failure_restore_timer != NULL) {
+        return ESP_OK;
+    }
+
+    const esp_timer_create_args_t timer_args = {
+        .callback = prov_failure_restore_timer_cb,
+        .name = "prov_fail_rst",
+    };
+    return esp_timer_create(&timer_args, &s_prov_failure_restore_timer);
+}
+
+static void sync_device_discovery(const wifi_prov_event_info_t *info)
+{
+    if (info == NULL) {
+        return;
+    }
+
+    switch (info->event) {
+    case WIFI_PROV_EVENT_AP_STARTED:
+    case WIFI_PROV_EVENT_PORTAL_READY:
+        (void)device_discovery_stop("portal");
+        break;
+    default:
+        break;
+    }
+
+    if (info->link_status == WIFI_LINK_STATUS_CONNECTED) {
+        (void)device_discovery_start();
+    } else if (s_last_link_status == WIFI_LINK_STATUS_CONNECTED) {
+        (void)device_discovery_stop("link_lost");
+    }
+
+    s_last_link_status = info->link_status;
+}
+
 static esp_err_t factory_reset_gpio_configure(void)
 {
     const b06_hil_board_pins_t *pins = board_pins();
@@ -160,6 +265,8 @@ static void factory_reset_wait_for_release(void)
 static void factory_reset_runtime_sequence(void)
 {
     ESP_LOGW(TAG, "factory reset requested (runtime)");
+
+    (void)device_discovery_stop("factory_reset");
 
     esp_err_t err = wifi_credentials_erase();
     if (err != ESP_OK) {
@@ -229,19 +336,24 @@ static void on_wifi_prov_event(const wifi_prov_event_info_t *info, void *ctx)
     switch (info->event) {
     case WIFI_PROV_EVENT_AP_STARTED:
     case WIFI_PROV_EVENT_PORTAL_READY:
+        cache_portal_display_context(info);
         show_provisioning_setup_display(info);
         break;
-    case WIFI_PROV_EVENT_SUBMITTED_CONNECTING: {
-        const char *lines[] = {"WIFI", "CONNECTING"};
-        (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, lines, 2);
+    case WIFI_PROV_EVENT_SUBMITTED_CONNECTING:
+        cancel_provisioning_setup_restore();
+        {
+            const char *lines[] = {"WIFI", "CONNECTING"};
+            (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, lines, 2);
+        }
         break;
-    }
     case WIFI_PROV_EVENT_SUBMITTED_SUCCESS:
+        cancel_provisioning_setup_restore();
         show_wifi_connected_display(info);
         break;
     case WIFI_PROV_EVENT_SUBMITTED_FAILURE: {
         const char *lines[] = {"WIFI", "FAILED"};
         (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, lines, 2);
+        schedule_provisioning_setup_restore();
         break;
     }
     case WIFI_PROV_EVENT_SAVED_CONNECTING:
@@ -272,6 +384,7 @@ static void on_wifi_prov_event(const wifi_prov_event_info_t *info, void *ctx)
     }
 
     apply_wifi_link_status_led(info->link_status);
+    sync_device_discovery(info);
 }
 
 esp_err_t app_core_wifi_start(void)
@@ -300,6 +413,11 @@ esp_err_t app_core_wifi_start(void)
 
     ESP_RETURN_ON_ERROR(wifi_provisioning_init(on_wifi_prov_event, NULL), TAG,
                         "wifi provisioning init failed");
+
+    ESP_RETURN_ON_ERROR(device_discovery_init(), TAG, "device discovery init failed");
+
+    ESP_RETURN_ON_ERROR(ensure_prov_failure_restore_timer(), TAG,
+                        "prov failure restore timer create failed");
 
     ESP_RETURN_ON_ERROR(factory_reset_monitor_start(), TAG, "factory reset monitor start failed");
 

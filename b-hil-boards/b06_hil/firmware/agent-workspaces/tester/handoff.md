@@ -14,7 +14,15 @@ Before starting any task in this file, run the **Role Boundary Check**:
 
 ## Current Status
 
-**Host procedures:** see `procedures.md` (NVS credential erase via `esptool`).
+**Host procedures:** see `procedures.md` (NVS erase, factory reset, **WiFi POST troubleshooting**).
+
+Run 023: **PASS (accepted)** — `DEVICE_DISCOVERY_MDNS_V1` (Entry 028; operator confirmed ping to .local).
+
+Run 022: **PASS** — `WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2` (Entry 027; operator-confirmed OLED sequence).
+
+**Field note (2026-06-28):** POST fail `reason=211` = AP security below firmware threshold
+(`WIFI_AUTH_WPA2_WPA3_PSK`); not password. See `procedures.md` § WiFi POST troubleshooting;
+`feedback.md` Entries 025–026 (openwrt-iot).
 
 Run 021: **PASS** — `WIFI_FACTORY_RESET_RUNTIME` (Entry 024; boot/short-press deferred).
 
@@ -37,6 +45,76 @@ Run 012: **PARTIAL PASS** — superseded by Run 013 for POST UX.
 Run 011: **PARTIAL PASS** — GET / formulario OK; POST falló con 431 (512 bytes). Corregido en Run 012 config.
 
 Run 006: **PASS** completo para `DISPLAY_VISUAL_DEMO_PROTOCOL` (demo retired).
+
+## DEVICE_DISCOVERY_MDNS_V1 — Run 023
+
+```text
+ID: DEVICE_DISCOVERY_MDNS_V1 (Run 023)
+Source: agent-workspaces/implementer/handoff.md § DEVICE_DISCOVERY_MDNS_V1
+  docs/device_discovery_mdns_architecture.md
+  docs/test_strategy.md § LAN mDNS discovery
+NVS at test start: erased via host (procedures.md)
+Network: openwrt-iot (WPA2/WPA3 mixed 2.4 GHz)
+Commands executed:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  esptool.py erase_region 0x9000 0x6000
+  Serial portal 20s -> /tmp/b06_hil_boot_log_run023_portal.txt
+  Serial provision 150s -> /tmp/b06_hil_boot_log_run023_mdns.txt
+  Operator POST openwrt-iot from phone on HIL-06-24CE
+  avahi-resolve -n HIL-06-24CE.local; ping HIL-06-24CE.local
+Hardware used:
+  ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+  SoftAP HIL-06-24CE (MAC 8c:d0:b2:a9:24:ce)
+Result:
+  Build/flash 0xe8e60: PASS (matches implementer handoff)
+  Portal boot without mdns start: PASS
+  identity HIL-06-24CE (SoftAP MAC4): PASS
+  POST + STA got IP 192.168.1.9: PASS (serial)
+  mdns start hostname=HIL-06-24CE: PASS (serial)
+  HIL-06-24CE.local resolves to 192.168.1.9: PASS (avahi-resolve < 2 s; ping OK)
+  Operator acceptance: PASS — ping HIL-06-24CE.local returns device IPv4 (2026-06-29)
+  Deferred: link_lost outage, factory_reset mdns stop
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 023
+  agent-workspaces/tester/feedback.md Entry 028
+  /tmp/b06_hil_boot_log_run023_{portal,mdns}.txt
+Recommendation:
+  **Accepted** DEVICE_DISCOVERY_MDNS_V1 for core v1 LAN discovery on openwrt-iot.
+  Operator confirmed ping to HIL-06-24CE.local resolves to STA IP.
+```
+
+## WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2 — Run 022
+
+```text
+ID: WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2 (Run 022)
+Source: agent-workspaces/implementer/handoff.md § WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2
+  docs/wifi_provisioning_first_connect_failure_ux_proposal.md
+  docs/test_strategy.md § First-connect failure OLED and LED
+NVS at test start: erased via host (procedures.md)
+Commands executed:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  esptool.py erase_region 0x9000 0x6000
+  Serial capture 120s -> /tmp/b06_hil_boot_log_run022_failure_flash.txt
+  Operator POST openwrt-iot + wrong password from phone on HIL-06-24CE
+Hardware used:
+  ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+  SoftAP HIL-06-24CE (MAC 8c:d0:b2:a9:24:ce)
+Result:
+  Build/flash 0xde470: PASS (matches implementer handoff)
+  Boot QR setup OLED: PASS (operator Entry 027)
+  POST failure serial (reason=202, no NVS save, no teardown): PASS
+  OLED CONNECTING → FAILED (~3s) → QR restore: PASS (operator-confirmed visual, Entry 027)
+  Browser failure page + AP active after failure: PASS (operator-confirmed, Entry 027)
+  Operator post-run confirmation: tests successful; OLED order matches UX v2 spec
+  Deferred (non-core): invalid form, re-POST during flash, reboot without creds
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 022
+  agent-workspaces/tester/feedback.md Entry 027
+  /tmp/b06_hil_boot_log_run022_failure_flash.txt
+Recommendation:
+  Accept WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2 for core v1 operator path.
+  Operator confirmed display sequence on hardware (2026-06-29).
+```
 
 ## WIFI_FACTORY_RESET_RUNTIME — Run 021
 

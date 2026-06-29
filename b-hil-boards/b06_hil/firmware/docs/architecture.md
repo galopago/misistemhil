@@ -22,6 +22,9 @@ Shared-document changes for display delivery are motivated by
 Shared-document changes for WiFi provisioning are motivated by
 `agent-workspaces/architect/handoff.md`, `WIFI_PROVISIONING_ARCHITECTURE`.
 
+Shared-document changes for LAN mDNS discovery are motivated by
+`agent-workspaces/architect/handoff.md`, `DEVICE_DISCOVERY_MDNS_V1`.
+
 ## Layers
 
 ```mermaid
@@ -33,6 +36,11 @@ flowchart TD
     AppCore --> I2cBroker["i2c_broker phase3"]
     AppCore --> WifiCredentials["components/wifi_credentials"]
     AppCore --> WifiProvisioning["components/wifi_provisioning"]
+    AppCore --> DeviceDiscovery["components/device_discovery"]
+    DeviceDiscovery --> DeviceIdentity["components/device_identity"]
+    DeviceDiscovery --> EspMdns["ESP-IDF mdns"]
+    DeviceIdentity --> Board
+    WifiProvisioning --> DeviceIdentity
     AppCore --> DisplayController["display controller"]
     WifiCredentials --> Nvs["ESP-IDF NVS"]
     WifiProvisioning --> EspWifi["ESP-IDF WiFi and HTTP"]
@@ -70,6 +78,12 @@ flowchart TD
 - `components/wifi_provisioning/`: SoftAP, HTTP portal, STA connection attempts,
   and provisioning state transitions. The v1 product contract is defined in
   `docs/wifi_provisioning_architecture.md`.
+- `components/device_identity/`: shared product hostname string
+  `HIL-<board>-<MAC4>` from board number and SoftAP MAC; used by provisioning AP
+  SSID and mDNS. See `docs/device_discovery_mdns_architecture.md`.
+- `components/device_discovery/`: mDNS hostname announcement when STA has IPv4 on
+  the user LAN. Orchestrated by `app_core_wifi`; see
+  `docs/device_discovery_mdns_architecture.md`.
 - `components/error_led/`: GPIO8 error LED patterns (off, slow/fast blink, solid
   on). WiFi link mapping is defined in `docs/error_led_wifi_link_architecture.md`;
   `app_core_wifi` is the adapter from `wifi_link_status_t`.
@@ -204,6 +218,29 @@ Rules:
   and encrypted NVS are non-goals until a future architect handoff.
 - The provisioning QR payload is exactly `http://192.168.4.1` and remains a
   display instruction routed through `app_core`.
+
+## LAN mDNS Discovery (v1)
+
+After STA connects to the user network, the device announces an mDNS hostname
+matching the provisioning SoftAP name (`HIL-06-<MAC4>`). Full contract:
+**`docs/device_discovery_mdns_architecture.md`**.
+
+Summary:
+
+```text
+STA GOT_IP + CONNECTED
+        --app_core_wifi-->
+device_discovery_start()
+        --mdns hostname-->
+HIL-06-24CE.local  →  DHCP IPv4
+```
+
+Rules:
+
+- Hostname-only v1 (no `_http._tcp` service record).
+- Active on user LAN STA only; not during provisioning SoftAP.
+- Identity MAC4 from SoftAP interface bytes 4–5 (same as OLED/QR SSID).
+- `wifi_provisioning` uses `device_identity`; it does not call mDNS directly.
 
 ## Toolchain Environment
 

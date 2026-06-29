@@ -490,6 +490,97 @@ Conclusion:
   See feedback.md Entry 007.
 ```
 
+### Run 023 — DEVICE_DISCOVERY_MDNS_V1
+
+```text
+Date: 2026-06-29
+Firmware: commit c38b8c2-dirty, b06_hil_firmware.bin 0xe8e60
+Handoff: DEVICE_DISCOVERY_MDNS_V1
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+          SoftAP MAC 8c:d0:b2:a9:24:ce → HIL-06-24CE
+NVS: erased via host (esptool erase_region 0x9000 0x6000)
+Network: openwrt-iot (WPA2/WPA3 mixed 2.4 GHz)
+Scope: core (portal no mdns; announce after STA IP; LAN .local resolve)
+Commands:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  esptool.py erase_region 0x9000 0x6000
+  Serial portal 20s -> /tmp/b06_hil_boot_log_run023_portal.txt
+  Serial provision 150s -> /tmp/b06_hil_boot_log_run023_mdns.txt
+  Operator POST openwrt-iot from phone on HIL-06-24CE
+  Host: avahi-resolve -n HIL-06-24CE.local; ping HIL-06-24CE.local
+Result:
+  Build/flash 0xe8e60: PASS (matches implementer handoff)
+  Phase B portal boot without mdns start: PASS (portal log grep)
+  device_id: identity HIL-06-24CE on portal: PASS (SoftAP MAC4)
+  POST openwrt-iot success: PASS (serial)
+  STA got IP ip=192.168.1.9 source=submitted: PASS
+  device_discovery: mdns start hostname=HIL-06-24CE: PASS (serial 147340 ms)
+  HIL-06-24CE.local → 192.168.1.9: PASS (avahi-resolve + ping, host same LAN)
+  IP match serial/OLED: PASS (192.168.1.9)
+  MAC4 suffix 24CE matches SoftAP not STA 24CD: PASS
+  Deferred: link_lost outage, factory_reset mdns stop
+Logs (/tmp/b06_hil_boot_log_run023_mdns.txt):
+  I (145570) wifi_prov: POST /provision attempting STA ssid=openwrt-iot
+  I (147320) wifi_prov: STA got IP ip=192.168.1.9 source=submitted
+  I (147320) wifi_prov: credentials saved source=submitted
+  I (147340) device_discovery: mdns start hostname=HIL-06-24CE
+LAN resolve:
+  $ avahi-resolve -n HIL-06-24CE.local
+  HIL-06-24CE.local  192.168.1.9
+Conclusion:
+  PASS for DEVICE_DISCOVERY_MDNS_V1 (core scope).
+  Operator accepted validation (2026-06-29): ping HIL-06-24CE.local returns device IP.
+  mDNS hostname announces on STA connect; .local resolves to DHCP IP on openwrt-iot LAN.
+  Deferred: runtime outage and factory reset stop/restart paths.
+  See feedback.md Entry 028.
+```
+
+### Run 022 — WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2
+
+```text
+Date: 2026-06-29
+Firmware: commit c38b8c2, b06_hil_firmware.bin 0xde470
+Handoff: WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+          SoftAP MAC 8c:d0:b2:a9:24:ce → HIL-06-24CE
+NVS: erased via host (esptool erase_region 0x9000 0x6000)
+Scope: core (wrong-credentials POST → OLED flash → QR restore; portal stays up)
+Commands:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  esptool.py erase_region 0x9000 0x6000
+  Serial capture 120s with RTS reset -> /tmp/b06_hil_boot_log_run022_failure_flash.txt
+  Operator POST from phone (192.168.4.2): ssid=openwrt-iot, wrong password
+Result:
+  Build/flash 0xde470: PASS (matches implementer handoff)
+  Fresh NVS portal boot HIL-06-24CE: PASS (serial)
+  Phase A QR setup OLED at boot: PASS (operator, Entry 027)
+  GET / form load: PASS (serial 52132 ms)
+  POST parsed + attempting STA openwrt-iot: PASS (serial 76612–76642 ms)
+  STA disconnected reason=202 (AUTH_FAIL): PASS (serial 77362 ms)
+  POST failure response sent: PASS (serial 106742 ms; ~30 s STA wait)
+  No credentials saved / no AP teardown: PASS (serial grep)
+  Phase B–D OLED CONNECTING → FAILED (~3 s) → QR restore: PASS (operator-confirmed, Entry 027)
+  Browser failure page + retry form: PASS (operator-confirmed, Entry 027)
+  SoftAP still visible after failure: PASS (operator-confirmed, Entry 027; serial no teardown)
+  prov_fail_rst timer in firmware binary: PASS (strings audit)
+Logs (/tmp/b06_hil_boot_log_run022_failure_flash.txt):
+  I (622) wifi_prov: starting SoftAP ssid=HIL-06-24CE mode=AP
+  I (732) wifi_prov: provisioning portal ready at http://192.168.4.1
+  I (52132) wifi_prov: GET / from client
+  I (76642) wifi_prov: POST /provision attempting STA ssid=openwrt-iot
+  W (77362) wifi_prov: STA disconnected reason=202 source=submitted
+  I (106742) wifi_prov: POST /provision failure response sent
+Conclusion:
+  PASS for WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2 (core scope).
+  Operator confirmed successful test: OLED sequence CONNECTING → FAILED (~3 s) → QR setup
+  restore displayed in the documented order (Entry 027 post-run confirmation).
+  Serial evidence aligns (reason=202, failure response, no NVS save, portal remains up).
+  Deferred: invalid form OLED unchanged, re-POST during flash, reboot-without-creds (criteria 4–6).
+  See feedback.md Entry 027.
+```
+
 ### Run 021 — WIFI_FACTORY_RESET_RUNTIME
 
 ```text

@@ -27,6 +27,12 @@ Before starting any task in this file, run the **Role Boundary Check**:
 - `WIFI_RUNTIME_RECONNECT`: **implemented** (v1; superseded by v2 connect cycle).
 - `WIFI_CONNECT_CYCLE_AND_ERROR_LED_V2`: **implemented and operator-validated** (2026-06-23).
 - `WIFI_FACTORY_RESET_RUNTIME`: **implemented and operator-validated** (Run 021, 2026-06-23).
+- `WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2`: **implemented** (2026-06-28)
+  — 3 s `WIFI / FAILED` flash then restore standard QR setup from cached portal
+  context (`docs/wifi_provisioning_first_connect_failure_ux_proposal.md`).
+- `DEVICE_DISCOVERY_MDNS_V1`: **implemented** (2026-06-28)
+  — mDNS hostname `HIL-<board>-<MAC4>.local` when STA has IP
+  (`docs/device_discovery_mdns_architecture.md`).
 - `WIFI_PROVISIONING_ARCHITECTURE`: **Run 013 POST PASS, saved boot reliability FAIL**
   — saved credentials connect intermittently on cold reboot; corrective task
   `WIFI_PROVISIONING_SAVED_BOOT_RELIABILITY` **implemented** (pending tester 10-boot sweep).
@@ -41,6 +47,7 @@ Normative docs:
 - `docs/test_strategy.md`
 - `docs/display_visual_demo_protocol.md`
 - `docs/wifi_provisioning_architecture.md`
+- `docs/device_discovery_mdns_architecture.md`
 - `docs/error_led_wifi_link_architecture.md`
 - `docs/error_led_runtime_link_architecture.md`
 - `docs/wifi_runtime_reconnect_architecture.md`
@@ -1586,6 +1593,67 @@ Questions or technical debt:
   - None for display delivery scope.
 Ready for tester:
   Yes for full display v1 stack including QR encode path.
+```
+
+## WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2
+
+```text
+Role boundary check:
+  Architect handoff approved 2026-06-28. Display/timer logic in app_core only.
+ID: WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2
+Source handoff:
+  agent-workspaces/architect/handoff.md § WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2
+  docs/wifi_provisioning_first_connect_failure_ux_proposal.md
+Summary:
+  On SUBMITTED_FAILURE: show WIFI / FAILED, start 3000 ms esp_timer one-shot,
+  then restore standard QR setup from cached AP_STARTED/PORTAL_READY context.
+  Cancel timer on SUBMITTED_CONNECTING and SUBMITTED_SUCCESS. Do not modify QR
+  setup line copy.
+Modified files:
+  - components/app_core/app_core_wifi.c
+  - components/app_core/CMakeLists.txt (esp_timer REQUIRES)
+  - docs/wifi_provisioning_first_connect_failure_flow.md (v2 alignment)
+Commands executed:
+  bash -lc 'source $IDF_PATH/export.sh && idf.py build'
+Build result:
+  PASS — b06_hil_firmware.bin 0xde470 (ESP-IDF 5.3, esp32c3)
+Questions or technical debt:
+  None. esp_timer used (same pattern as error_led).
+Ready for tester:
+  Yes — verify first-connect failure OLED flash + QR restore per test_strategy.md.
+```
+
+## DEVICE_DISCOVERY_MDNS_V1
+
+```text
+Role boundary check:
+  Architect handoff DEVICE_DISCOVERY_MDNS_V1 approved 2026-06-28.
+ID: DEVICE_DISCOVERY_MDNS_V1
+Source handoff:
+  agent-workspaces/architect/handoff.md § DEVICE_DISCOVERY_MDNS_V1
+  docs/device_discovery_mdns_architecture.md
+Summary:
+  device_identity builds HIL-<board>-<MAC4> from BOARD_HIL_NUMBER_STRING and
+  SoftAP MAC bytes 4-5. device_discovery announces hostname via espressif/mdns
+  on STA netif when link_status is CONNECTED. app_core_wifi orchestrates
+  start/stop from wifi_prov events. wifi_provisioning AP SSID uses
+  device_identity_get().
+Modified files:
+  - components/device_identity/ (new)
+  - components/device_discovery/ (new, idf_component.yml espressif/mdns ^1.0.3)
+  - components/wifi_provisioning/wifi_provisioning.c, CMakeLists.txt
+  - components/app_core/app_core_wifi.c, CMakeLists.txt
+Commands executed:
+  bash -lc 'source $IDF_PATH/export.sh && idf.py build'
+Build result:
+  PASS — b06_hil_firmware.bin 0xe8e60 (ESP-IDF 5.3, esp32c3)
+Kconfig (from managed mdns component defaults):
+  CONFIG_MDNS_PREDEF_NETIF_STA=y, CONFIG_MDNS_MAX_INTERFACES=3,
+  CONFIG_MDNS_MAX_SERVICES=10, CONFIG_MDNS_TASK_STACK_SIZE=4096
+Questions or technical debt:
+  mDNS is espressif/mdns managed component (not in core ESP-IDF since v5.0).
+Ready for tester:
+  Yes — resolve HIL-06-XXXX.local on LAN after STA connect per test_strategy.md.
 ```
 
 ## Template

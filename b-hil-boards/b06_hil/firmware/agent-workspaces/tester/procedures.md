@@ -145,6 +145,71 @@ esptool.py --port /dev/ttyACM0 --chip esp32c3 erase_region 0x9000 0x6000
 
 Then re-provision via portal, or inject valid credentials with the same CSV flow.
 
+## WiFi POST troubleshooting notes (field findings)
+
+Reference for future connectivity debug sessions. Full serial evidence:
+`feedback.md` Entries 025–026; captures `/tmp/b06_hil_wifi_debug_new_ap2.txt` (fail),
+`/tmp/b06_hil_wifi_debug_new_ap3.txt` (pass).
+
+### Firmware STA profile (v2, unchanged)
+
+- `apply_sta_config()` in `wifi_provisioning.c`:
+  - `threshold.authmode = WIFI_AUTH_WPA2_WPA3_PSK`
+  - `auth_profile=wpa2_wpa3_personal`, PMF capable, PMF not required
+  - POST timeout: 30 s (`WIFI_PROV_STA_TIMEOUT_MS`)
+
+### Disconnect `reason=211` — auth mode threshold (2026-06-28)
+
+**Symptom:** Portal POST fails; serial shows:
+
+```text
+POST /provision attempting STA ssid=<ssid>
+STA disconnected reason=211 source=submitted
+POST /provision failure response sent
+```
+
+**Meaning (ESP-IDF 5.3):** `WIFI_REASON_NO_AP_FOUND_IN_AUTHMODE_THRESHOLD` — the AP
+was seen in scan but **rejected** because its security mode is below the firmware
+threshold. This is **not** a wrong-password symptom (`202` = `AUTH_FAIL`).
+
+**Common AP configs that trigger 211:**
+
+| AP encryption | Typical result |
+|---------------|----------------|
+| Open / OWE | Fail (211) |
+| WPA-PSK only or WPA/WPA2 mixed (legacy) | Fail (211) |
+| WPA-Enterprise / 802.1X | Fail (211) |
+| SSID only on 5 GHz | Fail (201 or 211) |
+| WPA2-PSK personal on **2.4 GHz** | Usually OK |
+| WPA3-SAE personal on 2.4 GHz | OK (validated: vitriolina) |
+| **WPA2-PSK/WPA3-SAE mixed** on 2.4 GHz | OK (validated: openwrt-iot) |
+
+**Validated fix (openwrt-iot on OpenWrt):** set encryption to **WPA2-PSK/WPA3-SAE
+Mixed Mode**, SSID on **2.4 GHz** radio, apply & save. After fix:
+
+```text
+wifi:connected with openwrt-iot
+STA got IP ip=192.168.1.9 source=submitted
+credentials saved source=submitted
+POST /provision success response sent
+```
+
+### Serial capture tips
+
+- Reset ESP (RTS) before capture so POST milestones are not missed.
+- Capture 90–120 s from boot through POST.
+- Key lines: `attempting STA ssid=`, `STA disconnected reason=`, `STA got IP`.
+
+### When to escalate to implementer vs operator
+
+| Observation | Owner |
+|-------------|--------|
+| reason=211 on WPA2/WPA3 personal 2.4 GHz AP | Implementer (threshold / scan) |
+| reason=211 on open/enterprise/legacy AP | Operator (AP config) |
+| reason=202 | Operator (password) or WPA3 transition |
+| reason=201 | Operator (SSID typo, 5 GHz only, out of range) |
+| No `POST /provision from client` | Portal reachability (phone not on HIL AP) |
+
 ## Standard flash and monitor (reference)
 
 ```bash
