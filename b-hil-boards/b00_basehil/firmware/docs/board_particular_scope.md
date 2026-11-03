@@ -4,7 +4,7 @@
 Board ID: b00_basehil
 Board number: 00
 Base tree referenced: b00_basehil/firmware (this repository)
-Last synced BASE-CHANGE ID: BASE-CHANGE-20261103-5
+Last synced BASE-CHANGE ID: BASE-CHANGE-20261103-6
   (see docs/board_base_sync_log.md)
 
 Pointers (required):

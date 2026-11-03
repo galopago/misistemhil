@@ -38,8 +38,10 @@ Reuse rules: **`docs/hil_base_reuse_contract.md`**.
 LLM propagation of base edits: **`docs/hil_base_spec_changelog.md`**.  
 Particular-repo template: **`docs/hil_board_particular_spec_template.md`**.  
 Host API (pillar 3): **`docs/external_host_api_architecture.md`** plus
-`docs/external_host_command_api.md` and `docs/external_host_stream_api.md`
-(v1 concept normative; firmware pending).
+`docs/external_host_command_api.md` and `docs/external_host_stream_api.md`.
+
+Flash / partitions (this base reference): **`docs/flash_partition_architecture.md`**
+(4 MB flash, large single `factory` app; no dual-OTA yet).
 
 ```mermaid
 flowchart LR
@@ -112,6 +114,8 @@ flowchart TD
   retired from normal product firmware.
 - `components/board/`: pin map, board details, and abstractions specific to
   `b00_basehil`, including the `GPIO7` active-low factory reset input.
+- Flash layout: build-time `partitions.csv` + `sdkconfig.defaults` flash size;
+  see `docs/flash_partition_architecture.md` (not a runtime component).
 - `components/i2c_bus/`: generic shared I2C master bus and device-handle
   registration. Device protocol drivers consume handles from this layer. The
   portable contract, incremental concurrency phases, and ESP-IDF binding are

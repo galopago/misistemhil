@@ -14,6 +14,11 @@ Before starting any task in this file, run the **Role Boundary Check**:
 
 ## Current Status
 
+- `FLASH_4MB_LARGE_FACTORY`: **config landed** (2026-11-03) — not built in-session
+  — `sdkconfig` / `sdkconfig.defaults`: flash **4MB**; custom `partitions.csv`
+  with `factory` **0x3F0000** (~4032K) at `0x10000`; NVS still `0x9000`.
+  — Next build needs `idf.py fullclean` (or reconfigure) + flash; partition
+    table change may require erase-flash once.
 - `HOST_API_AFTER_PORTAL_TEARDOWN`: **implemented** (2026-11-03)
   — `PORTAL_TEARDOWN_COMPLETE` after SoftAP httpd stop → `host_api_start()`
   (closes Run 029).

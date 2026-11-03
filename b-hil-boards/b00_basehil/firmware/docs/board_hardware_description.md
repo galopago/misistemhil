@@ -34,7 +34,13 @@ Schematic / PCB references:
 | Module | ESP32-C3 SuperMini |
 | SoC class | ESP32-C3 (RISC-V) |
 | ESP-IDF target | `esp32c3` |
+| Flash (this bench module) | **4 MB** (build/partition contract) |
 | Role | Minimum MCU for human-supervised base bring-up and pillar reference |
+
+Flash size and partition table for this base firmware:
+`docs/flash_partition_architecture.md` (`partitions.csv`: large single
+`factory` app, NVS at `0x9000`). Sibling boards document their own flash if
+different.
 
 Other `bNN_hil` boards MUST NOT assume this MCU. They document their own module
 in their own `board_hardware_description.md`.

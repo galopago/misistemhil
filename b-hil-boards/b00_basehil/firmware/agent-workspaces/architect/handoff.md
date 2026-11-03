@@ -45,6 +45,8 @@ Active handoffs:
 - `DEVICE_DISCOVERY_MDNS_V1`
 - `HIL_BASE_REUSE_CONTRACT` (**docs complete** 2026-11-02; **pillars extension** 2026-11-02 — no implementer firmware work)
 
+- `FLASH_4MB_LARGE_FACTORY` (**docs complete** 2026-11-03 — config already in tree;
+  build/flash by implementer/tester)
 - `HOST_API_AFTER_PORTAL_TEARDOWN` (**docs complete** 2026-11-03 — firmware pending;
   closes `TESTER_RETURN_HOST_API_AFTER_PROVISION` / Run 029)
 
@@ -224,6 +226,29 @@ Acceptance criteria:
   - BASE-CHANGE-20261102-3 recorded.
 Open questions:
   - None.
+```
+
+## FLASH_4MB_LARGE_FACTORY
+
+```text
+Role boundary check: architect documentation only (no idf.py).
+ID: FLASH_4MB_LARGE_FACTORY
+Date: 2026-11-03
+Source: Human — document flash/partition decision as lasting architecture base.
+Objective: Normative record of 4MB flash + large single factory partition.
+Authorized docs:
+  - docs/flash_partition_architecture.md (new; authoritative)
+  - docs/architecture.md, board_hardware_description.md
+  - docs/hil_base_platform_scope.md, hil_base_reuse_contract.md
+  - docs/hil_base_spec_changelog.md (BASE-CHANGE-20261103-6)
+  - agent-workspaces/architect/handoff.md, decisions.md
+  - docs/board_base_sync_log.md, board_particular_scope.md
+Normative summary:
+  - Flash 4MB; custom partitions.csv factory 0x3F0000 @ 0x10000; NVS 0x9000
+  - No dual-OTA yet; siblings must not assume old 1MB factory
+Config already present: partitions.csv, sdkconfig.defaults (and sdkconfig)
+Build validation: implementer/tester only (architect does not compile).
+Open questions: None.
 ```
 
 ## HOST_API_AFTER_PORTAL_TEARDOWN

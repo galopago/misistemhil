@@ -234,3 +234,27 @@ Required particular-repo actions:
   - Record this ID as consumed in the board sync log.
 Code impact in base tree: pending implementer HOST_API_AFTER_PORTAL_TEARDOWN.
 ```
+
+### BASE-CHANGE-20261103-6
+
+```text
+ID: BASE-CHANGE-20261103-6
+Date: 2026-11-03
+Summary: Document b00 flash/partition baseline — 4MB flash, custom
+  partitions.csv with large single factory app (0x3F0000), no dual-OTA yet.
+Pillars affected:
+  - None directly (build/hardware support contract)
+Affected base docs:
+  - docs/flash_partition_architecture.md (new)
+  - docs/architecture.md
+  - docs/board_hardware_description.md
+  - docs/hil_base_platform_scope.md
+  - docs/hil_base_reuse_contract.md
+Required particular-repo actions:
+  - Do not assume 1MB factory or 2MB flash from older base builds.
+  - If reusing this tree's partitions.csv, confirm the board module is 4MB
+    (or adapt the table) and note NVS remains at 0x9000.
+  - Record this ID as consumed in the board sync log.
+Code impact in base tree: partitions.csv + sdkconfig.defaults already set;
+  validate with fullclean/build outside architect role.
+```

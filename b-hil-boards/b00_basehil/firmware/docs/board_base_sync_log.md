@@ -106,3 +106,17 @@ Actions taken in this repo:
 Open questions:
   - None
 ```
+
+## Sync entry
+
+```text
+Consumed IDs: BASE-CHANGE-20261103-6
+Date consumed: 2026-11-03
+Agent role: architect
+Actions taken in this repo:
+  - Added docs/flash_partition_architecture.md; linked from architecture,
+    hardware description, platform scope, reuse contract.
+  - Recorded FLASH_4MB_LARGE_FACTORY decision (4MB + large factory, no OTA).
+Open questions:
+  - None
+```

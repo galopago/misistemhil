@@ -1681,6 +1681,27 @@ Open questions:
 
 ---
 
+## 2026-11-03 — Flash 4MB + large single factory partition
+
+```text
+Date: 2026-11-03
+Decision: b00_basehil reference builds assume 4MB module flash
+  (CONFIG_ESPTOOLPY_FLASHSIZE=4MB) and a custom partitions.csv with a single
+  factory app of size 0x3F0000 at 0x10000; NVS stays at 0x9000/0x6000. No
+  dual-OTA until an explicit product requirement. Prefer this over IDF
+  singleapp (1MB) or singleapp_large (1500K).
+Context: App (~1MB) filled ~91% of the 1MB factory partition while the chip
+  has 4MB; sdkconfig previously declared 2MB.
+Consequences:
+  - docs/flash_partition_architecture.md; BASE-CHANGE-20261103-6.
+  - partitions.csv + sdkconfig.defaults already updated; build/flash by
+    implementer/tester (fullclean; possible erase-flash).
+Open questions:
+  - None for this baseline.
+```
+
+---
+
 ## 2026-11-03 — Host API after portal teardown (port 80 race)
 
 ```text

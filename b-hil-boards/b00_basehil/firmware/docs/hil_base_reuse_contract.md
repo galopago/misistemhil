@@ -103,6 +103,7 @@ board session remains self-contained for agents while behavior stays aligned.
 | First-connect failure | `docs/wifi_provisioning_first_connect_failure_flow.md` |
 | First-connect failure UX | `docs/wifi_provisioning_first_connect_failure_ux_proposal.md` |
 | Factory reset | `docs/wifi_factory_reset_architecture.md` |
+| Flash / partitions (b00 reference) | `docs/flash_partition_architecture.md` |
 | Connect cycle | `docs/wifi_connect_cycle_architecture.md` |
 | Runtime reconnect | `docs/wifi_runtime_reconnect_architecture.md` |
 | Error LED (WiFi / runtime / cycle) | `docs/error_led_wifi_link_architecture.md`, `docs/error_led_runtime_link_architecture.md`, `docs/error_led_connect_cycle_architecture.md` |

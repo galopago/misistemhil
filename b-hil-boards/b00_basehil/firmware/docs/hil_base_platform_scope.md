@@ -125,6 +125,7 @@ surface because onboarding, discovery, and host API depend on them:
 | --- | --- |
 | Reuse / family rules | `docs/hil_base_reuse_contract.md`, this file |
 | Engineering overview | `docs/architecture.md` |
+| Flash / partitions (b00 reference) | `docs/flash_partition_architecture.md` |
 | Display delivery / OLED / QR | `docs/display_delivery_contract.md`, `docs/oled_text_display_interface.md`, `docs/qr_encoder_interface.md` |
 | I2C bus (shared master, device-agnostic) | `docs/i2c_bus_architecture.md` |
 | Methodology / roles | `docs/methodology.md`, `AGENTS.md`, `docs/architect_role_hard_stop.md` |
