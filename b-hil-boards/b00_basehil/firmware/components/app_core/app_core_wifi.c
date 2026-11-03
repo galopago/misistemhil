@@ -3,7 +3,9 @@
 #include "app_core.h"
 #include "board_pins.h"
 #include "device_discovery.h"
+#include "device_identity.h"
 #include "display_types.h"
+#include "host_api.h"
 #include "wifi_credentials.h"
 #include "wifi_provisioning.h"
 
@@ -65,22 +67,26 @@ static void apply_wifi_link_status_led(wifi_link_status_t status)
 
 static void show_wifi_connected_display(const wifi_prov_event_info_t *info)
 {
+    char hostname[DEVICE_ID_MAX_LEN] = {0};
+    const esp_err_t id_err = device_identity_get(hostname, sizeof(hostname));
+
     if (info == NULL || info->sta_ipv4 == NULL || info->sta_mac == NULL ||
-        strlen(info->sta_mac) != 17U) {
+        strlen(info->sta_mac) != 17U || id_err != ESP_OK) {
         const char *fallback[] = {"WIFI", "OK"};
         (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, fallback, 2);
         return;
     }
 
-    char mac_line2[9];
     char mac_line3[9];
-    strncpy(mac_line2, info->sta_mac, WIFI_OK_MAC_PREFIX_LEN);
-    mac_line2[WIFI_OK_MAC_PREFIX_LEN] = '\0';
-    strncpy(mac_line3, info->sta_mac + WIFI_OK_MAC_SUFFIX_OFFSET, 8);
-    mac_line3[8] = '\0';
+    char mac_line4[9];
+    strncpy(mac_line3, info->sta_mac, WIFI_OK_MAC_PREFIX_LEN);
+    mac_line3[WIFI_OK_MAC_PREFIX_LEN] = '\0';
+    strncpy(mac_line4, info->sta_mac + WIFI_OK_MAC_SUFFIX_OFFSET, 8);
+    mac_line4[8] = '\0';
 
-    const char *lines[] = {WIFI_OK_LINE_STATUS, info->sta_ipv4, mac_line2, mac_line3};
-    (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_FOUR_LINES, lines, 4);
+    /* WIFI OK / HIL-00-XXXX (no .local) / IPv4 / MAC split — FULL_FIVE_LINES. */
+    const char *lines[] = {WIFI_OK_LINE_STATUS, hostname, info->sta_ipv4, mac_line3, mac_line4};
+    (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_FIVE_LINES, lines, 5);
 }
 
 static void show_provisioning_setup_display(const wifi_prov_event_info_t *info)
@@ -179,6 +185,23 @@ static esp_err_t ensure_prov_failure_restore_timer(void)
     return esp_timer_create(&timer_args, &s_prov_failure_restore_timer);
 }
 
+static void try_host_api_start(bool after_portal_teardown)
+{
+    const esp_err_t err = host_api_start();
+    if (err == ESP_OK) {
+        return;
+    }
+
+    if (after_portal_teardown) {
+        ESP_LOGE(TAG, "host API start after portal teardown failed: %s",
+                 esp_err_to_name(err));
+    } else {
+        /* POST success emits CONNECTED while SoftAP httpd still owns :80 (Run 029). */
+        ESP_LOGW(TAG, "host API start deferred (port busy or error): %s",
+                 esp_err_to_name(err));
+    }
+}
+
 static void sync_device_discovery(const wifi_prov_event_info_t *info)
 {
     if (info == NULL) {
@@ -188,7 +211,13 @@ static void sync_device_discovery(const wifi_prov_event_info_t *info)
     switch (info->event) {
     case WIFI_PROV_EVENT_AP_STARTED:
     case WIFI_PROV_EVENT_PORTAL_READY:
+        (void)host_api_stop("portal");
         (void)device_discovery_stop("portal");
+        break;
+    case WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE:
+        if (info->link_status == WIFI_LINK_STATUS_CONNECTED) {
+            try_host_api_start(true);
+        }
         break;
     default:
         break;
@@ -196,7 +225,11 @@ static void sync_device_discovery(const wifi_prov_event_info_t *info)
 
     if (info->link_status == WIFI_LINK_STATUS_CONNECTED) {
         (void)device_discovery_start();
+        if (info->event != WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE) {
+            try_host_api_start(false);
+        }
     } else if (s_last_link_status == WIFI_LINK_STATUS_CONNECTED) {
+        (void)host_api_stop("link_lost");
         (void)device_discovery_stop("link_lost");
     }
 
@@ -266,8 +299,9 @@ static void factory_reset_runtime_sequence(void)
 {
     ESP_LOGW(TAG, "factory reset requested (runtime)");
 
-    (void)device_discovery_stop("factory_reset");
-
+    /* Do not call device_discovery_stop() here while STA+mDNS may be active —
+     * mdns_unregister_netif can hang (Run 025) and block erase/portal.
+     * Discovery stops on AP_STARTED/PORTAL_READY with reason=portal. */
     esp_err_t err = wifi_credentials_erase();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "factory reset erase failed err=%s", esp_err_to_name(err));
@@ -378,6 +412,9 @@ static void on_wifi_prov_event(const wifi_prov_event_info_t *info, void *ctx)
         break;
     }
     case WIFI_PROV_EVENT_LINK_STATUS_CHANGED:
+        break;
+    case WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE:
+        /* Host API start is handled in sync_device_discovery. */
         break;
     default:
         break;

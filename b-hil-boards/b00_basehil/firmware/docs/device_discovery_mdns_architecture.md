@@ -45,7 +45,8 @@ custom `_hil._tcp`, TXT, port, or path).
 | Discovery shape | Hostname A record only (`*.local` resolution) |
 | Hostname string | Same spelling as SoftAP SSID / OLED: uppercase `HIL-00-24CE` |
 | MAC source for `<MAC4>` | **SoftAP interface** bytes 4–5, not STA MAC |
-| OLED display of `.local` | Out of scope v1 |
+| OLED connected screen | Show hostname **without** `.local` (see `OLED_CONNECTED_MDNS_HOSTNAME_LINE`) |
+| OLED display of `.local` suffix | Out of scope v1 (clients still resolve `HIL-00-24CE.local`) |
 
 Human decisions recorded 2026-06-28.
 
@@ -198,7 +199,13 @@ device_id: identity HIL-00-24CE
 - Idempotent.
 - Stops mDNS announcement on STA netif; does not deinit global mDNS unless WiFi
   stack is torn down.
-- Log reason enum in message:
+- **MUST return in bounded time.** MUST NOT hang indefinitely (including inside
+  `mdns_unregister_netif` or equivalent) when STA is still connected. If a
+  platform call can block in that state, skip that call and rely on WiFi stop /
+  SoftAP portal transition to end announcement (see factory-reset ordering in
+  `docs/wifi_factory_reset_architecture.md`).
+- Log reason enum in message **after** the stop path has completed (or decided to
+  no-op), never before a call that might never return:
 
 ```text
 device_discovery: mdns stop reason=link_lost
@@ -208,6 +215,12 @@ device_discovery: mdns stop reason=wifi_stop
 ```
 
 Implementer MAY use a single stop path with a string reason parameter.
+
+**Factory reset:** Do **not** require a pre-erase synchronous
+`device_discovery_stop("factory_reset")` while STA+mDNS are active. Prefer stop
+via portal events (`portal`) after SoftAP start, or an explicit `factory_reset`
+stop only after STA is down. Erase + portal MUST proceed even if discovery stop
+is skipped or fails.
 
 ## Lifecycle
 
@@ -257,13 +270,16 @@ Call `device_discovery_stop()` on:
 
 | Event / condition | Stop reason |
 | --- | --- |
-| `WIFI_PROV_EVENT_AP_STARTED` / `PORTAL_READY` | `portal` |
-| Factory reset → portal transition | `factory_reset` |
+| `WIFI_PROV_EVENT_AP_STARTED` / `PORTAL_READY` | `portal` (preferred path after factory reset opens SoftAP) |
+| Factory reset after STA stopped (optional explicit reason) | `factory_reset` |
 | `LINK_STATUS_CHANGED` leaving `CONNECTED` | `link_lost` |
 | Connect cycle / runtime reconnect while not `CONNECTED` | `link_lost` |
 | WiFi stack stop / deinit if implemented | `wifi_stop` |
 
 Do **not** announce during SoftAP provisioning on `192.168.4.0/24`.
+
+Do **not** block the factory-reset erase/portal sequence on a discovery stop while
+STA+mDNS are still active (`TESTER_RETURN_FACTORY_RESET_MDNS_HANG` / Run 025).
 
 ### Boot integration
 

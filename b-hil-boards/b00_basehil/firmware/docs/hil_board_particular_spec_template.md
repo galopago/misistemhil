@@ -114,6 +114,8 @@ MCU / module:
   - Clock, flash, PSRAM notes as needed
 On-board peripherals (non-exhaustive categories):
   - Display, LEDs, buttons/reset, buses (I2C/SPI/UART/RS-485), relays, ADCs, …
+  - Extra I2C product devices beyond base OLED (e.g. INA219 @ addresses …),
+    if any — base test profile does not require them
 Power:
   - Input rails, regulation, isolation notes
 Pin map (schematic-confirmed; mark pending with TODO(bNN-hil): ):
@@ -162,20 +164,34 @@ Explicit non-goals for this board:
 ## Required sections: `board_host_api_extensions.md`
 
 ```text
-Base contract: b00_basehil/firmware/docs/external_host_api_architecture.md
-Compatibility: must not break base methods/fields required by the family host API
-Extensions:
-  - Method/path or message name:
+Base contracts:
+  - b00_basehil/firmware/docs/external_host_api_architecture.md
+  - b00_basehil/firmware/docs/external_host_command_api.md
+  - b00_basehil/firmware/docs/external_host_stream_api.md
+Compatibility: must not change /v1 paths, Base64 frame limits, or mandatory
+  ping / info / capabilities
+Mandatory base commands on this board: ping, info, capabilities (inherited)
+Note: agents discover commands/streams via on-device capabilities, not this file.
+Extra commands:
+  - name:
     Purpose:
-    Request:
-    Response:
+    Args:
+    Result:
     Errors:
+Streams:
+  - stream_id: (or "none")
+    Purpose:
+    params schema:
+    Payload semantics (host→board / board→host):
+    Hardware backend:
 Non-extensions (forbidden):
-  - Replacing base discovery or WiFi onboarding protocols
+  - Replacing base discovery, WiFi onboarding, or host transport/framing
   - Shadow APIs that duplicate base host semantics under new names without cause
+  - Expecting agents to read repo Markdown instead of POST capabilities
 ```
 
-If the board has no host API extensions yet, the file MUST state that explicitly.
+If the board has no extra commands and no streams, state that explicitly
+(`Extra commands: none`, `Streams: none`). Firmware `capabilities` MUST match.
 
 ## Required sections: `board_base_sync_log.md`
 

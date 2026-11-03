@@ -27,8 +27,11 @@ Board electrical details for the current target remain in
    caching rules are fixed in this document.
 4. **MCU portability.** Portable semantics are defined first; ESP-IDF is the current
    platform binding, not the architectural center.
-5. **Optional peripherals.** Projects without INA219 omit that driver and its
-   startup calls. The bus component stays unchanged.
+5. **Optional peripherals.** The shared bus is family infrastructure. Product
+   I2C slaves beyond the base OLED (for example INA219, or other sensors on
+   `bNN_hil` daughter boards) are optional components owned by that board.
+   Projects without those devices omit their drivers and startup calls. The bus
+   component stays unchanged.
 
 ## Three-Layer Model
 
@@ -476,14 +479,23 @@ Behavior:
 - MUST NOT initialize hardware.
 - MUST NOT reference specific peripherals beyond pin constants.
 
-Example address macros for `b00_basehil`:
+Example address macros for the **`b00_basehil` minimum test profile**:
 
 ```text
 BOARD_OLED_ALLOWED = [0x3C, 0x3D]
+```
+
+Example address macros for a **daughter board** that adds current-sense I2C
+devices (not required on the base test bench):
+
+```text
 BOARD_INA219_ADDRESSES = [0x40, 0x41, 0x42]
 ```
 
-Other boards MAY omit INA219 macros entirely.
+`b00_basehil` bring-up MUST NOT require INA219 macros or an `ina219` component.
+Daughter boards that need INA219 (or any other extra I2C slave) document
+addresses in their own `board` component and
+`docs/board_hardware_description.md`.
 
 ## Application Startup Contract
 
@@ -522,7 +534,7 @@ Rules:
 - Missing OLED at boot MUST NOT crash the firmware; the display stack MAY remain
   on a hardware stub until a driver is enabled.
 
-### `b00_basehil` profile
+### `b00_basehil` minimum test profile
 
 | Step | Action |
 | --- | --- |
@@ -531,11 +543,16 @@ Rules:
 | 3 | Resolve OLED address with policy above |
 | 4 | `i2c_bus_add_device(oled_address)` when found |
 | 5 | Pass handle through `display_config_t` to `display_start()` |
-| 6 | Future optional: register `0x40`, `0x41`, `0x42` for INA219 when component exists |
 
-### Display-only profile
+No INA219 (or other extra I2C slave) registration on this profile.
 
-Steps 1 through 5 only. No INA219 component, no INA219 startup calls.
+### Daughter-board profile with extra I2C devices
+
+Same steps 1–5 for OLED when present, then for each enabled product device
+(for example INA219 at `0x40`/`0x41`/`0x42`, or other slaves): resolve address
+policy, `i2c_bus_add_device`, pass handle to that board's optional driver.
+Extra devices are authorized only by that board's hardware description and
+handoff — not by the base test profile.
 
 ## Device Driver Boundary
 
@@ -562,9 +579,13 @@ Rules:
 - Until SSD1306/SH1106 is confirmed, the driver MAY remain a stub that stores
   the handle without transmitting frames.
 
-### Future INA219 driver (optional component)
+### Future / daughter-board INA219 driver (optional component)
 
-Expected shape:
+INA219 is an **example** of a product I2C device for **daughter boards**, not a
+required part of the `b00_basehil` minimum test bench. The same pattern applies
+to other extra I2C slaves.
+
+Expected shape when a board includes the component:
 
 ```c
 status_t ina219_init(i2c_bus_device_t device, ...);
@@ -574,8 +595,10 @@ status_t ina219_read(i2c_bus_device_t device, ...);
 After phase 2, read/write paths MUST use `i2c_bus_transceive`. After phase 3,
 they MUST use `i2c_broker_submit`.
 
-`b00_basehil` expects three instances at `0x40`, `0x41`, and `0x42`. Other projects
-omit the component.
+A board that ships three INA219 devices SHOULD use addresses `0x40`, `0x41`, and
+`0x42` unless its schematic differs (then document the actual addresses in that
+board's hardware description). Boards without INA219 omit the component
+entirely; `i2c_bus` stays unchanged.
 
 ## ESP-IDF 5.x Platform Profile (Current Target)
 
@@ -664,8 +687,11 @@ An implementation satisfies this architecture if:
 - `board` remains the source of pin and address constants for the PCB.
 - `app_core` initializes the bus before display or sensor drivers.
 - Display renderer/controller code contains no I2C or GPIO references.
-- A display-only firmware reuses `i2c_bus` without source changes.
-- `b00_basehil` can attach OLED and INA219 clients to the same shared bus.
+- A display-only / base-test firmware reuses `i2c_bus` without source changes and
+  without requiring INA219.
+- The same shared bus architecture can attach OLED plus daughter-board I2C
+  clients (for example INA219) when those optional components exist on that
+  board.
 - Another LLM implementer can read only this document and produce substantially
   similar module boundaries, file paths, and runtime behavior.
 

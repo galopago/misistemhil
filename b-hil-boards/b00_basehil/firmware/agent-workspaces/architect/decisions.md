@@ -1584,3 +1584,216 @@ Affected files:
 Open questions:
   - None.
 ```
+
+---
+
+## 2026-11-03 — External host API v1: JSON commands + TCP streams
+
+```text
+Date: 2026-11-03
+Decision: SUPERSEDED by "agent-primary HTTP stream write/read" below.
+  Original: HTTP control + TCP :9000 length-prefixed frames.
+Context: Initial concept assumed a host binary tool for the data plane.
+Consequences: See BASE-CHANGE-20261103-2; corrected in BASE-CHANGE-20261103-3.
+```
+
+---
+
+## 2026-11-03 — External host API v1: agent-primary HTTP frames
+
+```text
+Date: 2026-11-03
+Decision: Primary host client is the LLM agent. v1 uses HTTP JSON only on STA
+  port 80: /v1/command plus /v1/stream/open|close|write|read with Base64
+  payloads (max 1024 decoded bytes), bounded read timeouts, one session.
+  Raw TCP data port and WebSocket are non-goals for v1 (optional later for
+  non-agent tools; must not replace HTTP write/read). Mandatory ping/info;
+  SoftAP portal stays separate.
+Context: Agent cannot safely hold a blocking TCP socket in the terminal; every
+  turn must be a short HTTP exchange.
+Consequences:
+  - Host API docs revised; BASE-CHANGE-20261103-3.
+  - Firmware pending EXTERNAL_HOST_API_V1_CONCEPT (HTTP-only host_api).
+Affected files:
+  - docs/external_host_api_architecture.md
+  - docs/external_host_command_api.md
+  - docs/external_host_stream_api.md
+  - docs/hil_base_platform_scope.md, hil_base_reuse_contract.md, architecture.md
+  - docs/hil_board_particular_spec_template.md, board_host_api_extensions.md
+  - docs/hil_base_spec_changelog.md
+  - docs/board_base_sync_log.md, board_particular_scope.md
+  - agent-workspaces/architect/handoff.md, decisions.md
+  - agent-workspaces/implementer/handoff.md (pending)
+Open questions:
+  - None for v1 concept.
+```
+
+---
+
+## 2026-11-03 — Ask-the-board capabilities + b00 echo/loopback demos
+
+```text
+Date: 2026-11-03
+Decision: Mandatory POST /v1/command name=capabilities returns a firmware-
+  embedded manifest (summary, commands[], streams[]). Agents discover APIs by
+  asking the board on the LAN, not by reading the repo. b00_basehil reference
+  demos: command echo (text max 128) and stream loopback (write enqueues for
+  read); not family-mandatory for siblings. SoftAP portal stays separate.
+Context: Auto-description must be runtime; base bench needs smoke-test command
+  and stream without DUT UART.
+Consequences:
+  - BASE-CHANGE-20261103-4; handoff HOST_API_CAPABILITIES_ECHO_LOOPBACK.
+  - Firmware pending (host_api + handlers + embedded manifest).
+Affected files:
+  - docs/external_host_api_architecture.md, external_host_command_api.md,
+    external_host_stream_api.md, hil_base_platform_scope.md, architecture.md
+  - docs/hil_board_particular_spec_template.md, board_host_api_extensions.md
+  - docs/hil_base_spec_changelog.md, board_base_sync_log.md,
+    board_particular_scope.md
+  - agent-workspaces/architect/handoff.md, decisions.md
+  - agent-workspaces/implementer/handoff.md (pending)
+Open questions:
+  - None for this docs slice.
+```
+
+---
+
+## 2026-11-03 — Host API implementer package closed (no code)
+
+```text
+Date: 2026-11-03
+Decision: Fix implementer structure to avoid divergence: new component
+  components/host_api/ (host_api.c, host_api_command.c, host_api_stream.c,
+  host_api_capabilities.c + include/host_api.h); public API host_api_start/
+  stop/is_running; esp_http_server separate from SoftAP; cJSON + mbedtls
+  Base64; lifecycle hooks in app_core_wifi sync_device_discovery (same window
+  as mDNS); global mutex with busy if lock >100 ms; exact b00 capabilities
+  JSON including echo + loopback; RX queue depth 16. Temporary owner of
+  app_core_wifi.c: implementer.
+Context: Wire contracts were clear; module/API/lifecycle were not.
+Consequences:
+  - Architect handoff HOST_API_CAPABILITIES_ECHO_LOOPBACK expanded.
+  - Implementer handoff points at that section as authoritative.
+  - Still no firmware code from architect.
+Open questions:
+  - None.
+```
+
+---
+
+## 2026-11-03 — Host API after portal teardown (port 80 race)
+
+```text
+Date: 2026-11-03
+Decision: SoftAP portal httpd and STA host_api share port 80 exclusively.
+  After POST provision success, emit WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE
+  when SoftAP httpd is stopped and STA-only mode is active; app_core then
+  calls host_api_start(). Early CONNECTED may attempt start and WARN on bind
+  failure while portal httpd is up; authoritative start is teardown-complete.
+  wifi_provisioning must not depend on host_api. No reboot required for /v1.
+Context: Run 029 — STA+mDNS OK after reprovision but :80 refused; Run 028
+  saved boot PASS. Tester return TESTER_RETURN_HOST_API_AFTER_PROVISION.
+Consequences:
+  - Docs + handoff HOST_API_AFTER_PORTAL_TEARDOWN; BASE-CHANGE-20261103-5.
+  - Firmware pending implementer; tester re-run POST path + saved-boot.
+Open questions:
+  - None.
+```
+
+---
+
+## 2026-11-03 — OLED string width budget; connected IP uses MEDIUM
+
+```text
+Date: 2026-11-03
+Decision: Document per-font character budgets on 128 px lines (SMALL 21,
+  MEDIUM 16, LARGE 10). Height-only AUTO_FIT on 16 px bands selects LARGE and
+  truncates strings >10 chars. Connected WiFi screen moves to five-line MEDIUM
+  layout (see following decision).
+Context: Operator saw truncated STA IP on WIFI OK screen.
+Open questions:
+  - None.
+```
+
+---
+
+## 2026-11-03 — Connected OLED shows mDNS hostname between WIFI OK and IP
+
+```text
+Date: 2026-11-03
+Decision: WIFI connected OLED uses FULL_FIVE_LINES + MEDIUM:
+  WIFI OK / HIL-<board>-<MAC4> / IPv4 / MAC hi / MAC lo. Hostname from
+  device_identity_get(), no .local suffix. Supersedes four-line-only
+  OLED_CONNECTED_IP_WIDTH_FIT delivery.
+Context: Human asked to show the mDNS announce name on the connected screen.
+Consequences:
+  - New template FULL_FIVE_LINES; app_core_wifi show_wifi_connected_display
+    builds five lines.
+  - Implementer handoff OLED_CONNECTED_MDNS_HOSTNAME_LINE pending.
+Affected files:
+  - docs/oled_text_display_interface.md
+  - docs/device_discovery_mdns_architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md, decisions.md
+  - implementer: display templates + app_core_wifi (pending)
+Open questions:
+  - None.
+```
+
+---
+
+## 2026-11-03 — Factory reset must not block behind mDNS stop
+
+```text
+Date: 2026-11-03
+Decision: Runtime factory reset normative order remains erase then
+  factory_reset_to_portal. Blocking device_discovery_stop before erase while
+  STA+mDNS are active is forbidden. Prefer portal-event discovery stop (reason
+  portal) after SoftAP start, or an explicit factory_reset stop only after STA
+  is down and guaranteed to return in bounded time. Erase+portal must succeed
+  even if discovery stop is skipped. Add STA+mDNS acceptance (Run 025 gap).
+Context: Tester Run 025 — hold detected, hang in mdns_unregister_netif; NVS not
+  erased. Run 021 had passed without mDNS announcing.
+Consequences:
+  - docs/wifi_factory_reset_architecture.md, device_discovery_mdns_architecture.md,
+    test_strategy.md updated.
+  - Implementer handoff WIFI_FACTORY_RESET_MDNS_SAFE pending.
+Affected files:
+  - docs/wifi_factory_reset_architecture.md
+  - docs/device_discovery_mdns_architecture.md
+  - docs/test_strategy.md
+  - agent-workspaces/architect/handoff.md, decisions.md
+Open questions:
+  - None.
+```
+
+---
+
+## 2026-11-03 — Extra I2C devices are daughter-board particular
+
+```text
+Date: 2026-11-03
+Decision: Shared i2c_bus remains base-owned and device-agnostic. Extra product
+  I2C slaves (INA219 as the historical example, or others) are optional
+  particular devices for bNN_hil boards. The b00_basehil minimum test profile is
+  OLED-only on I2C; docs must not imply INA219 is required on the base bench.
+Context: Early experiments used INA219; base bring-up will not fit them, but
+  daughter boards may. Clarify architecture so LLMs do not remove bus support
+  or force INA into the base profile.
+Consequences:
+  - esp32_c3_supermini_connections.md and i2c_bus_architecture.md retargeted.
+  - hil_base_platform_scope.md states the I2C ownership split explicitly.
+  - BASE-CHANGE-20261103-1 added; drivers untouched.
+Affected files:
+  - docs/esp32_c3_supermini_connections.md
+  - docs/i2c_bus_architecture.md
+  - docs/architecture.md
+  - docs/hil_base_platform_scope.md
+  - docs/hil_base_reuse_contract.md
+  - docs/hil_board_particular_spec_template.md
+  - docs/hil_base_spec_changelog.md
+  - docs/board_base_sync_log.md, docs/board_particular_scope.md
+  - agent-workspaces/architect/decisions.md, handoff.md
+Open questions:
+  - None.
+```

@@ -606,6 +606,44 @@ selected font. This canonical algorithm is authoritative for the base version:
 when a requested class does not fit, the implementation uses the smallest
 available font rather than inventing another fallback policy.
 
+### String width budget (v1 fonts on 128 px line)
+
+Current `b00_basehil` glyph widths (monospace classes):
+
+| Font class | Glyph width | Max full-width chars (`floor(128 / glyph_width)`) |
+| --- | --- | --- |
+| SMALL | 6 px | 21 |
+| MEDIUM | 8 px | 16 |
+| LARGE | 12 px | 10 |
+
+Rules for producers (`app_core` and any layout builder):
+
+1. Before choosing a template + font policy, estimate the **worst-case** string
+   length that must remain fully readable (no reliance on silent truncation).
+2. IPv4 dotted-quad MUST be treated as up to **15** characters
+   (`255.255.255.255`). That requires **MEDIUM or SMALL**, never LARGE on a
+   full-width single line.
+3. `AUTO_FIT` on a `FULL_FOUR_LINES` band (16 px height) selects the largest font
+   that fits **height**, which is **LARGE** with the current font table — so
+   strings longer than 10 characters **will truncate**. Do not use height-only
+   `AUTO_FIT` for lines that must show 11–16 characters.
+4. Truncation remains last-resort renderer behavior (`truncate_to_width`, no
+   ellipsis). Product screens that need the full string MUST pick a fitting font
+   or split content across lines (as MAC already does).
+
+Connected WiFi status screen MUST show five lines (see handoffs
+`OLED_CONNECTED_IP_WIDTH_FIT` and `OLED_CONNECTED_MDNS_HOSTNAME_LINE`):
+
+```text
+Line 0: WIFI OK
+Line 1: HIL-<board>-<MAC4>     # mDNS / SoftAP identity, no .local
+Line 2: <sta_ipv4>             # full IPv4, ≤15 chars
+Line 3: MAC bytes 0–2 as XX:XX:XX
+Line 4: MAC bytes 3–5 as XX:XX:XX
+```
+
+Use template **`FULL_FIVE_LINES`** with font policy **MEDIUM**.
+
 Recommended font classes for a `128x64` display:
 
 - `SMALL`: approximate visual height `8` to `12 px`.
@@ -751,6 +789,8 @@ API boundary for v1:
 The implementation should document at least these reference templates:
 
 - `FULL_FOUR_LINES`: four compact lines across the full display.
+- `FULL_FIVE_LINES`: five compact lines across the full display (WiFi connected
+  status: status, mDNS hostname, IP, split MAC).
 - `FULL_TWO_LINES`: two larger lines across the full display.
 - `TOP_TWO_BOTTOM_ONE`: two compact lines in the upper half and one larger line
   in the lower half.
@@ -773,7 +813,8 @@ DisplayRegion
     type: TEXT
     text:
       max_lines: 4
-      font_policy: AUTO_FIT or SMALL
+      font_policy: MEDIUM   # required for product paths that show IPv4 / ≤16 chars
+                           # (AUTO_FIT on 16 px bands yields LARGE and truncates >10 chars)
 ```
 
 Effective line bands:
@@ -782,6 +823,39 @@ Effective line bands:
 - Line 1: `y = 16`, height `16 px`.
 - Line 2: `y = 32`, height `16 px`.
 - Line 3: `y = 48`, height `16 px`.
+
+As-built note: older code used `AUTO_FIT` here; that is **incorrect** for lines
+that must show 11–16 characters. Prefer **MEDIUM** when budgeting those strings.
+The WiFi connected product screen MUST use `FULL_FIVE_LINES` (below), not this
+four-line template.
+
+### Full Five Lines
+
+Goal: connected WiFi status with mDNS identity + IP + MAC on one screen.
+
+```text
+DisplayRegion
+  rect: { x: 0, y: 0, width: 128, height: 64 }
+  content:
+    type: TEXT
+    text:
+      max_lines: 5
+      font_policy: MEDIUM
+```
+
+Effective line bands (fill 64 px):
+
+- Line 0: `y = 0`, height `12 px`
+- Line 1: `y = 12`, height `12 px`
+- Line 2: `y = 24`, height `12 px`
+- Line 3: `y = 36`, height `12 px`
+- Line 4: `y = 48`, height `16 px` (absorbs remainder)
+
+MEDIUM visual height is 12 px (fits bands). MEDIUM glyph width 8 px allows up to
+16 characters — enough for IPv4 (15) and `HIL-00-XXXX` (11).
+
+Enum / API: `DISPLAY_TEMPLATE_FULL_FIVE_LINES` +
+`display_layout_template_full_five_lines()` + controller `show_template` case.
 
 ### Full Two Lines
 
@@ -1418,6 +1492,7 @@ Input:
             "vertical_align": "CENTER",
             "lines": [
               { "text": "WIFI OK" },
+              { "text": "HIL-00-24CE" },
               { "text": "192.168.1.42" },
               { "text": "AA:BB:CC" },
               { "text": "DD:EE:FF" }
@@ -1432,12 +1507,18 @@ Input:
 
 Expected behavior:
 
-- Four `16 px` line bands across full 128×64 display.
-- AUTO_FIT selects SMALL font (6 px/glyph) for 16 px band height.
-- Line 1 shows full IPv4 without truncation for addresses up to 15 characters.
-- Lines 2 and 3 are the MAC split of `AA:BB:CC:DD:EE:FF` at indices 0–7 and
+- Five line bands (`FULL_FIVE_LINES`) across full 128×64 display.
+- Font policy **MEDIUM** (8 px/glyph): up to 16 characters per full-width line.
+- Line 1 is the mDNS/SoftAP identity from `device_identity_get()` (e.g.
+  `HIL-00-24CE`), **without** `.local`.
+- Line 2 shows full IPv4 without truncation for addresses up to 15 characters
+  (including worst case `255.255.255.255`).
+- Lines 3 and 4 are the STA MAC split of `AA:BB:CC:DD:EE:FF` at indices 0–7 and
   9–16; concatenating with `:` at index 8 restores the full MAC string.
 - Screen persists until replaced by a later display instruction.
+
+Incorrect (do not ship): four-line connected screen missing hostname; height-only
+`AUTO_FIT` → LARGE truncating IP; hostname with `.local` suffix on OLED.
 
 ## Implementation Constraints For `b00_basehil`
 

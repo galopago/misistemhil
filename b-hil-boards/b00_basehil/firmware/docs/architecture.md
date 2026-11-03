@@ -37,7 +37,9 @@ Delimiter: **`docs/hil_base_platform_scope.md`**.
 Reuse rules: **`docs/hil_base_reuse_contract.md`**.  
 LLM propagation of base edits: **`docs/hil_base_spec_changelog.md`**.  
 Particular-repo template: **`docs/hil_board_particular_spec_template.md`**.  
-Host API home (detail pending): **`docs/external_host_api_architecture.md`**.
+Host API (pillar 3): **`docs/external_host_api_architecture.md`** plus
+`docs/external_host_command_api.md` and `docs/external_host_stream_api.md`
+(v1 concept normative; firmware pending).
 
 ```mermaid
 flowchart LR
@@ -148,9 +150,13 @@ flowchart TD
 - Do not use peripherals until there is a decision recorded by the architect.
 - Prefer conventional ESP-IDF components before custom abstractions.
 - Keep I2C bus ownership in `i2c_bus`; keep device protocol logic in optional
-  device drivers such as `display_driver` or a future `ina219` component.
-- Optional device components are included per project. A display-only firmware
-  may omit INA219 entirely without changing `i2c_bus`.
+  device drivers such as `display_driver` or a daughter-board `ina219` (or other
+  I2C) component.
+- Optional I2C product devices are **per board**, not required on the
+  `b00_basehil` minimum test profile (OLED-only bench). Daughter boards
+  (`bNN_hil`) MAY add INA219 or other I2C slaves via their own `board` constants
+  and optional components without changing `i2c_bus`. See
+  `docs/i2c_bus_architecture.md` and `docs/hil_base_platform_scope.md`.
 - The I2C bus layer is MCU-portable by design: portable semantics, startup
   order, and concurrency phases live in `docs/i2c_bus_architecture.md`; ESP-IDF
   is the current platform profile, not the long-term architectural boundary.
@@ -168,6 +174,12 @@ flowchart TD
   path as any other content change.
 - On-screen strings for v1 are printable ASCII only; tildes, accented letters,
   and non-English scripts are out of scope. Unsupported characters sanitize to `?`.
+- OLED layouts MUST budget string length against font glyph width (see
+  `docs/oled_text_display_interface.md` § String width budget). Full IPv4 on one
+  line requires MEDIUM or SMALL, not LARGE / height-only AUTO_FIT on 16 px bands.
+- WiFi connected OLED uses five lines (`FULL_FIVE_LINES`, MEDIUM): `WIFI OK`,
+  mDNS/SoftAP hostname without `.local`, full STA IPv4, split STA MAC
+  (`OLED_CONNECTED_MDNS_HOSTNAME_LINE`).
 - Setup QR payloads are `http://IPv4` (implicit root `/` only). Path redirects
   and HTTPS are out of scope; another entity handles routing after scan.
 - v1 OLED is read-only informational output: no menus, navigation, or on-display
@@ -263,6 +275,21 @@ Rules:
   and encrypted NVS are non-goals until a future architect handoff.
 - The provisioning QR payload is exactly `http://192.168.4.1` and remains a
   display instruction routed through `app_core`.
+
+## External Host API (v1 Concept)
+
+After STA has IPv4, the **primary client is an LLM agent**. All host I/O is
+HTTP JSON on port 80 (`http://HIL-<board>-<MAC4>.local/v1/...`):
+
+- `POST /v1/command` — `ping`, `info`, **`capabilities`** (ask-the-board
+  manifest), plus particular names.
+- `POST /v1/stream/open|close|write|read` — session + Base64 frames (max 1024
+  decoded bytes; bounded read timeouts). No raw TCP data port in v1.
+
+Agents discover the actionable catalog with `capabilities` on the device (not
+from git). Reference board demos: `echo` command + `loopback` stream
+(`HOST_API_CAPABILITIES_ECHO_LOOPBACK`). SoftAP provisioning HTTP remains
+separate. Firmware pending.
 
 ## LAN mDNS Discovery (v1)
 

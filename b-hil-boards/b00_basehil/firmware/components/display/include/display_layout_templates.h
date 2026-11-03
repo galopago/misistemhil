@@ -9,6 +9,9 @@ extern "C" {
 void display_layout_template_full_four_lines(display_layout_t *layout,
                                              const char *const *lines,
                                              size_t line_count);
+void display_layout_template_full_five_lines(display_layout_t *layout,
+                                             const char *const *lines,
+                                             size_t line_count);
 void display_layout_template_full_two_lines(display_layout_t *layout,
                                             const char *const *lines,
                                             size_t line_count);

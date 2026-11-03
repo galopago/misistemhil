@@ -16,6 +16,22 @@ Before starting any task in this file, run the **Role Boundary Check**:
 
 **Host procedures:** see `procedures.md` (NVS erase, factory reset, **WiFi POST troubleshooting**).
 
+Run 031: **PASS** — saved-boot / power-cycle regression (`HOST_API_AFTER_PORTAL_TEARDOWN`).
+
+Run 030: **PASS** — `HOST_API_AFTER_PORTAL_TEARDOWN` (post-reprovision :80 + /v1 without reboot).
+
+Run 029: **FAIL (partial)** — superseded by Run 030; was post-reprovision :80 refused.
+
+Run 028: **PASS** — `HOST_API_CAPABILITIES_ECHO_LOOPBACK` (ping/info/capabilities/echo + loopback stream) on **saved-boot** path.
+
+Run 027: **PASS** — `OLED_CONNECTED_IP_WIDTH_FIT` (operator: full IPv4 visible on OLED; no truncation).
+
+Run 026: **PASS** — `WIFI_FACTORY_RESET_MDNS_SAFE` (STA+mDNS hold → erase + portal; reboot SoftAP).
+
+Run 025: **FAIL** — `WIFI_FACTORY_RESET_RUNTIME` while STA+mDNS connected (hold detects, then hang; NVS not erased). Superseded by Run 026.
+
+Run 024: **PASS** — `BASE_REMOVE_INA219_MACROS` smoke (build/flash/boot after INA macros removed).
+
 Run 023: **PASS (accepted)** — `DEVICE_DISCOVERY_MDNS_V1` (Entry 028; operator confirmed ping to .local).
 
 Run 022: **PASS** — `WIFI_PROVISIONING_FIRST_CONNECT_FAILURE_UX_V2` (Entry 027; operator-confirmed OLED sequence).
@@ -45,6 +61,267 @@ Run 012: **PARTIAL PASS** — superseded by Run 013 for POST UX.
 Run 011: **PARTIAL PASS** — GET / formulario OK; POST falló con 431 (512 bytes). Corregido en Run 012 config.
 
 Run 006: **PASS** completo para `DISPLAY_VISUAL_DEMO_PROTOCOL` (demo retired).
+
+## Architect review — host API missing after fresh POST provision
+
+```text
+ID: TESTER_RETURN_HOST_API_AFTER_PROVISION
+Date: 2026-11-03
+Source: Run 029 operator reprovision; Run 028 contrast (saved boot PASS)
+Firmware: 10e21ad-dirty 0xf3590 HOST_API_CAPABILITIES_ECHO_LOOPBACK
+Device: HIL-00-24CE / 192.168.1.10 (avahi-resolve; no host RTS reset)
+
+Observed (no board reset during probe):
+  OLED: WIFI OK + IP (operator).
+  avahi-resolve -n HIL-00-24CE.local → 192.168.1.10; ping OK.
+  TCP port 80 (and 8080/8000/443/81/8888): Connection refused.
+  curl POST /v1/command → fail connect.
+  Passive SoftAP portal httpd gone; STA+mDNS up; host_api not listening.
+
+Contrast:
+  Run 028 (cold boot with saved NVS): serial "host API started port=80";
+  ping/info/capabilities/echo + loopback PASS.
+  Failure is specific to path after factory-reset + new POST provision
+  without a subsequent reboot (or equivalent host_api restart).
+
+Tester analysis (code):
+  sync_device_discovery on LINK CONNECTED calls device_discovery_start()
+  then host_api_start() (app_core_wifi.c).
+  POST success emits SUBMITTED_SUCCESS (CONNECTED) while wifi_provisioning
+  SoftAP httpd still owns port 80; only later schedule_success_teardown()
+  stops that httpd. host_api_start() likely fails bind; error discarded
+  via (void)host_api_start(); no retry after teardown.
+  Saved-boot has no portal httpd → host_api_start succeeds.
+
+Architect decisions requested:
+  1. Confirm intended order: start host API only after portal httpd stopped,
+     or stop portal before CONNECTED host_api_start, or retry start after
+     teardown.
+  2. Acceptance: after POST success (no reboot), /v1/command must work on
+     STA IPv4 / .local within bounded time.
+  3. Authorize implementer fix + re-test (POST path + saved-boot regression).
+
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 029
+  agent-workspaces/tester/feedback.md Entry 033
+  Terminal: avahi-resolve + port probe 2026-11-03 (no RTS reset)
+
+Architect disposition (2026-11-03): CLOSED → handoff
+  HOST_API_AFTER_PORTAL_TEARDOWN (docs). Firmware pending implementer.
+  Decision: WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE after SoftAP httpd stop;
+  app_core host_api_start(); port 80 SoftAP XOR host_api; no reboot required.
+  Re-test: POST path without reboot + saved-boot regression.
+
+Tester validation (2026-11-03): Run 030 PASS after implementer flash 0xf3730 —
+  erase + reprovision without RTS reset; :80 open; /v1 ping/info/echo + loopback OK.
+  Return CLOSED.
+```
+
+## HOST_API_AFTER_PORTAL_TEARDOWN — Run 031 (power cycle)
+
+```text
+ID: HOST_API_AFTER_PORTAL_TEARDOWN saved-boot regression (Run 031)
+Source: operator power cycle after Run 030
+Commands (no RTS reset): avahi-resolve; :80; ping/info/echo; loopback
+  -> /tmp/b00_host_api_run031_power_cycle.txt
+Result: mDNS 192.168.1.10, :80 OPEN, all /v1 + loopback PASS
+Recommendation: Accept saved-boot regression for HOST_API_AFTER_PORTAL_TEARDOWN.
+```
+
+## HOST_API_AFTER_PORTAL_TEARDOWN — Run 030
+
+```text
+ID: HOST_API_AFTER_PORTAL_TEARDOWN (Run 030)
+Source: implementer fix; closes TESTER_RETURN_HOST_API_AFTER_PROVISION
+Commands executed (no RTS reset):
+  avahi-resolve / ping HIL-00-24CE.local
+  TCP :80; curl ping/info/echo; loopback AQID
+  -> /tmp/b00_host_api_run030_post_provision.txt
+Hardware: HIL-00-24CE @ 192.168.1.10 after operator erase + reprovision
+Result:
+  mDNS + ICMP: PASS
+  TCP :80 OPEN: PASS (Run 029 was refused)
+  ping/info/echo + loopback: PASS
+Evidence: test_runs.md Run 030; feedback Entry 034
+Recommendation: Accept HOST_API_AFTER_PORTAL_TEARDOWN.
+```
+
+## HOST_API_CAPABILITIES_ECHO_LOOPBACK — Run 028
+
+```text
+ID: HOST_API_CAPABILITIES_ECHO_LOOPBACK (Run 028)
+Source: implementer handoff HOST_API_CAPABILITIES_ECHO_LOOPBACK
+Commands executed:
+  idf.py build && flash (prior); serial boot -> /tmp/b00_host_api_run028_boot.txt
+  curl POST http://HIL-00-24CE.local/v1/command (ping, info, capabilities, echo)
+  curl POST /v1/stream/open|write|read|close loopback AQID
+  Results -> /tmp/b00_host_api_run028_{results,loopback}.txt
+Hardware used:
+  ESP32-C3 SuperMini /dev/ttyACM0, OLED 0x3D, STA 192.168.1.10, HIL-00-24CE
+Result:
+  host_api started port=80 after mdns: PASS (serial)
+  mDNS resolve + ping: PASS
+  ping / info / capabilities / echo: PASS (HTTP 200, ok:true)
+  loopback open→write AQID→read AQID→close: PASS
+  SoftAP without /v1: NOT EXERCISED (device remained STA)
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 028
+  agent-workspaces/tester/feedback.md Entry 032
+Recommendation:
+  Accept HOST_API_CAPABILITIES_ECHO_LOOPBACK for STA command + loopback demos.
+  Optional follow-up: SoftAP negative test for /v1 absent.
+```
+
+## OLED_CONNECTED_IP_WIDTH_FIT — Run 027
+
+```text
+ID: OLED_CONNECTED_IP_WIDTH_FIT (Run 027)
+Source: implementer handoff OLED_CONNECTED_IP_WIDTH_FIT
+Commands executed:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  Boot portal capture -> /tmp/b00_basehil_boot_log_run027_ip_fit_boot.txt
+  Provision listen (partial) -> /tmp/b00_basehil_boot_log_run027_ip_fit_provision.txt
+  Operator POST + OLED visual confirmation
+Hardware used:
+  ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C, SoftAP HIL-00-F06F
+Result:
+  Build/flash 0xe8df0: PASS
+  FULL_FOUR_LINES DISPLAY_FONT_MEDIUM (code audit): PASS
+  Width budget MEDIUM ≤15 chars fits IPv4 ≤15: PASS (static)
+  Operator OLED: full IPv4 on connected screen, no truncation: PASS
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 027
+  agent-workspaces/tester/feedback.md Entry 031
+Recommendation:
+  Accept OLED_CONNECTED_IP_WIDTH_FIT.
+```
+
+## WIFI_FACTORY_RESET_MDNS_SAFE — Run 026
+
+```text
+ID: WIFI_FACTORY_RESET_MDNS_SAFE (Run 026)
+Source: implementer handoff WIFI_FACTORY_RESET_MDNS_SAFE; re-test of Run 025
+Commands executed:
+  idf.py build && idf.py -p /dev/ttyACM0 flash (prior turn)
+  Serial 60s GPIO7 hold -> /tmp/b00_basehil_boot_log_run026_factory_reset_mdns_safe.txt
+  Host RTS reboot 15s -> /tmp/b00_basehil_boot_log_run026_after_reset_reboot.txt
+Hardware used:
+  ESP32-C3 SuperMini on /dev/ttyACM0; saved STA openwrt-iot 192.168.1.11 + mDNS
+Result:
+  Build/flash 0xe8df0: PASS
+  STA+mDNS then GPIO7 ≥10 s: PASS
+  factory reset requested → abort → stopping wifi → SoftAP portal: PASS (~120 ms)
+  factory reset complete portal_active=true: PASS
+  mdns stop reason=portal (after WiFi stop; no hang): PASS
+  Post-reboot SoftAP portal (no STA reconnect): PASS — NVS erased
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 026
+  agent-workspaces/tester/feedback.md Entry 030
+Recommendation:
+  Accept WIFI_FACTORY_RESET_MDNS_SAFE. Closes TESTER_RETURN_FACTORY_RESET_MDNS_HANG.
+```
+
+## WIFI_FACTORY_RESET_RUNTIME — Run 025 (STA+mDNS hang)
+
+```text
+ID: WIFI_FACTORY_RESET_RUNTIME (Run 025 regression)
+Source: operator report — factory reset button not working as expected
+Commands executed:
+  Serial 45s during GPIO7 hold -> /tmp/b00_basehil_boot_log_run025_factory_reset_hold.txt
+  Post-hang reboot 18s -> /tmp/b00_basehil_boot_log_run025_after_failed_reset.txt
+Hardware used:
+  ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+  Saved STA openwrt-iot, IP 192.168.1.11, mDNS HIL-00-F06F
+Result:
+  GPIO7 10 s hold detected: PASS — W app_core_wifi: factory reset requested (runtime) @ 23462 ms
+  mdns stop / erase / portal transition logs: FAIL (absent; serial silent after W line)
+  Device idle after hang: FAIL (0 serial bytes until host RTS reset)
+  NVS credentials cleared: FAIL — reboot reconnects STA openwrt-iot + mdns start
+Root cause (tester analysis):
+  factory_reset_runtime_sequence logs, then calls device_discovery_stop("factory_reset").
+  Next expected log is device_discovery: mdns stop reason=factory_reset — never appears.
+  Hang is inside device_discovery_stop() before that log, i.e. mdns_unregister_netif()
+  while STA/mDNS active. Erase + wifi_provisioning_factory_reset_to_portal never run.
+  Note: Run 021 PASS was from portal/connect-cycle path; STA+mDNS path not covered then.
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 025
+  agent-workspaces/tester/feedback.md Entry 029
+  /tmp/b00_basehil_boot_log_run025_factory_reset_hold.txt
+  /tmp/b00_basehil_boot_log_run025_after_failed_reset.txt
+Recommendation:
+  Return to implementer/architect — see TESTER_RETURN_FACTORY_RESET_MDNS_HANG below.
+```
+
+## Architect / implementer review — Run 025 factory reset hang
+
+```text
+ID: TESTER_RETURN_FACTORY_RESET_MDNS_HANG
+Date: 2026-11-03
+Source: Run 025, feedback Entry 029, operator discussion request
+Firmware: 10e21ad-dirty 0xe8e80
+Prior accepted path: Run 021 WIFI_FACTORY_RESET_RUNTIME (portal / connect-cycle)
+
+Summary for human → implementer conversation:
+  GPIO7 factory reset IS detected after ≥10 s hold while STA is connected with
+  mDNS active, but the runtime sequence hangs and never erases NVS or opens the
+  provisioning portal. After a forced reset, saved credentials remain and the
+  device rejoins the home AP.
+
+Code path (app_core_wifi.c factory_reset_runtime_sequence):
+  1. ESP_LOGW factory reset requested (runtime)     ← OBSERVED
+  2. device_discovery_stop("factory_reset")
+       → mdns_unregister_netif(sta)                 ← HANG (no "mdns stop" log)
+  3. wifi_credentials_erase()                       ← NOT REACHED
+  4. wifi_provisioning_factory_reset_to_portal()    ← NOT REACHED
+
+Why Run 021 did not catch this:
+  Run 021 exercised reset from portal / connect-cycle (mDNS not announcing).
+  DEVICE_DISCOVERY_MDNS_V1 deferred factory_reset mdns stop; STA-connected
+  factory reset was not an acceptance case after mDNS landed.
+
+Tester recommendations (for architect decision / implementer fix):
+  1. Make factory reset safe when mDNS is active (ordering: stop WiFi / clear
+     abort path before or without blocking mdns_unregister_netif; or stop mDNS
+     from a context that cannot deadlock; or skip unregister and mdns_free).
+  2. Guarantee erase + portal still run even if discovery stop fails.
+  3. Add acceptance: STA connected + mDNS active → GPIO7 ≥10 s → NVS cleared,
+     SoftAP portal, serial shows erase + portal_active without hang.
+  4. Re-test portal-mode reset (Run 021) as regression after the fix.
+
+Tester does NOT change firmware or architecture docs. Operator will discuss
+with implementer; architect should authorize the fix handoff if criteria change.
+
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 025
+  agent-workspaces/tester/feedback.md Entry 029
+  /tmp/b00_basehil_boot_log_run025_{factory_reset_hold,after_failed_reset}.txt
+```
+
+## BASE_REMOVE_INA219_MACROS — Run 024
+
+```text
+ID: BASE_REMOVE_INA219_MACROS (Run 024)
+Source: agent-workspaces/implementer/handoff.md § BASE_REMOVE_INA219_MACROS
+Commands executed:
+  source ~/esp/esp-idf/export.sh
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  Serial 20s -> /tmp/b00_basehil_boot_log_run024_ina_removed.txt
+  Source/binary audit for BOARD_INA219 / ina219
+Hardware used:
+  ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+  SoftAP HIL-00-F06F (MAC 8c:d0:b2:a7:f0:6f)
+Result:
+  Build/flash 0xe8e80: PASS
+  No INA macros/refs in main/components or binary: PASS
+  Boot I2C + OLED 0x3C + SoftAP portal: PASS
+  No INA probe logs: PASS
+Evidence:
+  agent-workspaces/tester/test_runs.md Run 024
+  /tmp/b00_basehil_boot_log_run024_ina_removed.txt
+Recommendation:
+  Accept BASE_REMOVE_INA219_MACROS smoke. Base still boots and runs OLED/I2C
+  provisioning path without INA219 macros.
+```
 
 ## DEVICE_DISCOVERY_MDNS_V1 — Run 023
 

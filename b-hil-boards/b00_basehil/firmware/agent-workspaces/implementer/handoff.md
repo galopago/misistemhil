@@ -14,6 +14,24 @@ Before starting any task in this file, run the **Role Boundary Check**:
 
 ## Current Status
 
+- `HOST_API_AFTER_PORTAL_TEARDOWN`: **implemented** (2026-11-03)
+  — `PORTAL_TEARDOWN_COMPLETE` after SoftAP httpd stop → `host_api_start()`
+  (closes Run 029).
+- `HOST_API_CAPABILITIES_ECHO_LOOPBACK`: **implemented** (2026-11-03)
+  — POST-provision bring-up completed by `HOST_API_AFTER_PORTAL_TEARDOWN`.
+- `EXTERNAL_HOST_API_V1_CONCEPT`: **implemented** via host API packages.
+- `OLED_CONNECTED_MDNS_HOSTNAME_LINE`: **implemented** (2026-11-03)
+  — Connected OLED five lines: `WIFI OK` / `HIL-00-XXXX` / IPv4 / split MAC via
+  `FULL_FIVE_LINES` + MEDIUM (`device_identity_get`, no `.local`).
+- `OLED_CONNECTED_IP_WIDTH_FIT`: **implemented** (2026-11-03); superseded for
+  connected screen by `OLED_CONNECTED_MDNS_HOSTNAME_LINE`.
+  — `FULL_FOUR_LINES` still uses `DISPLAY_FONT_MEDIUM`.
+- `WIFI_FACTORY_RESET_MDNS_SAFE`: **implemented** (2026-11-03)
+  — runtime factory reset no longer blocks erase behind mDNS stop (Run 025);
+  `device_discovery_stop` clears local state only (bounded).
+- `BASE_REMOVE_INA219_MACROS`: **implemented** (2026-11-03)
+  — removed unused `BOARD_INA219_ADDRESS_*` from base `board_pins.h`; I2C bus
+  and OLED path unchanged.
 - `OLED_TEXT_DISPLAY_INTERFACE`: display stack + SSD1306 driver over I2C phase 2.
 - `I2C_BUS_ARCHITECTURE` phase 1 and `I2C_BUS_PHASE2`: done.
 - `DISPLAY_DELIVERY_CONTRACT`: **implemented** (`app_core_display_show_*`; sole caller).
@@ -55,6 +73,213 @@ Normative docs:
 - `docs/wifi_runtime_reconnect_architecture.md`
 - `docs/wifi_connect_cycle_architecture.md`
 - `docs/error_led_connect_cycle_architecture.md`
+
+## HOST_API_AFTER_PORTAL_TEARDOWN
+
+```text
+Role boundary check:
+  Architect handoff HOST_API_AFTER_PORTAL_TEARDOWN (2026-11-03) authorizes
+  wifi_provisioning event + app_core_wifi host_api restart.
+ID: HOST_API_AFTER_PORTAL_TEARDOWN
+Date: 2026-11-03
+Source:
+  - agent-workspaces/architect/handoff.md § HOST_API_AFTER_PORTAL_TEARDOWN
+  - tester Run 029 / TESTER_RETURN_HOST_API_AFTER_PROVISION
+Summary:
+  Root cause: POST success set CONNECTED and called host_api_start while SoftAP
+  httpd still owned :80; bind failed; teardown freed port with no retry.
+  Fix: WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE at end of success_teardown_task
+  after httpd_stop + STA-only; app_core try_host_api_start(true) with ESP_LOGE
+  on failure. Early CONNECTED start uses ESP_LOGW if port busy.
+Modified files:
+  - components/wifi_provisioning/include/wifi_provisioning.h
+  - components/wifi_provisioning/wifi_provisioning.c
+  - components/app_core/app_core_wifi.c
+  - agent-workspaces/implementer/handoff.md
+Commands executed:
+  - bash -lc 'source /home/libertad/esp/esp-idf/export.sh && idf.py build'
+Build result:
+  - PASS (ESP-IDF 5.3, esp32c3)
+  - b00_basehil_firmware.bin size 0xf3730 bytes
+Questions or technical debt:
+  - None for this handoff.
+Ready for tester:
+  Yes. Factory reset + POST provision WITHOUT reboot: after ~2s teardown,
+  serial "portal teardown complete" then "host API started port=80"; curl ping.
+  Regress saved-boot Run 028.
+Status: Complete (2026-11-03); tester validation pending.
+```
+
+## HOST_API_CAPABILITIES_ECHO_LOOPBACK
+
+```text
+Role boundary check:
+  Architect handoff HOST_API_CAPABILITIES_ECHO_LOOPBACK (2026-11-03) authorizes
+  components/host_api/* and app_core_wifi lifecycle hooks.
+ID: HOST_API_CAPABILITIES_ECHO_LOOPBACK
+Date: 2026-11-03
+Source:
+  - agent-workspaces/architect/handoff.md § HOST_API_CAPABILITIES_ECHO_LOOPBACK
+  - docs/external_host_api_architecture.md
+  - docs/external_host_command_api.md
+  - docs/external_host_stream_api.md
+Summary:
+  New components/host_api with separate STA httpd on port 80:
+  POST /v1/command (ping, info, capabilities, echo)
+  POST /v1/stream/open|close|write|read (loopback FIFO depth 16, Base64)
+  Mutex 100 ms → busy. Capabilities from embedded JSON catalog.
+  sync_device_discovery: CONNECTED → discovery_start then host_api_start;
+  leave CONNECTED / portal → host_api_stop then discovery_stop.
+Modified files:
+  - components/host_api/ (new)
+  - components/app_core/app_core_wifi.c
+  - components/app_core/CMakeLists.txt
+  - agent-workspaces/implementer/handoff.md
+Commands executed:
+  - bash -lc 'source /home/libertad/esp/esp-idf/export.sh && idf.py build'
+Build result:
+  - PASS (ESP-IDF 5.3, esp32c3)
+  - b00_basehil_firmware.bin size 0xf3590 bytes (~5% app partition free)
+Questions or technical debt:
+  - App partition nearly full (5% free); future growth may need partition resize.
+Ready for tester:
+  Yes. STA+IP: curl ping/info/capabilities/echo; loopback open→write AQID→read→close;
+  confirm no /v1 on SoftAP portal; stop on link_lost/portal.
+Status: Complete (2026-11-03); tester validation pending.
+```
+
+## OLED_CONNECTED_MDNS_HOSTNAME_LINE
+
+```text
+Role boundary check:
+  Architect handoff OLED_CONNECTED_MDNS_HOSTNAME_LINE (2026-11-03) authorizes
+  display templates/controller + app_core_wifi + CMake device_identity.
+ID: OLED_CONNECTED_MDNS_HOSTNAME_LINE
+Date: 2026-11-03
+Source:
+  - agent-workspaces/architect/handoff.md § OLED_CONNECTED_MDNS_HOSTNAME_LINE
+  - docs/oled_text_display_interface.md § Full Five Lines
+Summary:
+  Added DISPLAY_TEMPLATE_FULL_FIVE_LINES (MEDIUM). show_wifi_connected_display
+  shows WIFI OK / device_identity_get() (no .local) / sta_ipv4 / MAC split.
+  Fallback FULL_TWO_LINES WIFI/OK if identity or IP/MAC missing.
+Modified files:
+  - components/display/include/display_types.h
+  - components/display/include/display_layout_templates.h
+  - components/display/display_layout_templates.c
+  - components/display/display_controller.c
+  - components/app_core/app_core_wifi.c
+  - components/app_core/CMakeLists.txt
+  - agent-workspaces/implementer/handoff.md
+Commands executed:
+  - bash -lc 'source /home/libertad/esp/esp-idf/export.sh && idf.py build'
+Build result:
+  - PASS (ESP-IDF 5.3, esp32c3)
+  - b00_basehil_firmware.bin size 0xe8eb0 bytes
+Questions or technical debt:
+  - Renderer even-splits 64/5=12 px bands (MEDIUM fits); last-band 16 px remainder
+    from arch doc not special-cased (authorized files exclude renderer).
+Ready for tester:
+  Yes. STA connected: five OLED lines; hostname matches SoftAP/mDNS; full IP.
+Status: Complete (2026-11-03); tester visual validation pending.
+```
+
+## OLED_CONNECTED_IP_WIDTH_FIT
+
+```text
+Role boundary check:
+  Architect handoff OLED_CONNECTED_IP_WIDTH_FIT (2026-11-03) authorizes
+  display_layout_templates.c only.
+ID: OLED_CONNECTED_IP_WIDTH_FIT
+Date: 2026-11-03
+Source:
+  - agent-workspaces/architect/handoff.md § OLED_CONNECTED_IP_WIDTH_FIT
+  - docs/oled_text_display_interface.md § String width budget
+Summary:
+  FULL_FOUR_LINES font_policy AUTO_FIT → DISPLAY_FONT_MEDIUM so 16 px bands
+  use 8 px glyphs (≤16 chars/line). STA IPv4 up to 15 chars no longer truncated
+  by LARGE (10-char budget). FULL_TWO_LINES left on AUTO_FIT (non-goal).
+Modified files:
+  - components/display/display_layout_templates.c
+  - agent-workspaces/implementer/handoff.md
+Commands executed:
+  - bash -lc 'source /home/libertad/esp/esp-idf/export.sh && idf.py build'
+Build result:
+  - PASS (ESP-IDF 5.3, esp32c3)
+  - b00_basehil_firmware.bin size 0xe8df0 bytes
+Questions or technical debt:
+  - None. Width-aware AUTO_FIT remains architect backlog.
+Ready for tester:
+  Yes. STA connected OLED: full IPv4 on line 1; WIFI OK + split MAC intact.
+Status: Complete (2026-11-03); tester visual validation pending.
+```
+
+## WIFI_FACTORY_RESET_MDNS_SAFE
+
+```text
+Role boundary check:
+  Architect handoff WIFI_FACTORY_RESET_MDNS_SAFE (2026-11-03) authorizes
+  app_core_wifi.c, device_discovery.c, and as-built reference update.
+ID: WIFI_FACTORY_RESET_MDNS_SAFE
+Date: 2026-11-03
+Source:
+  - agent-workspaces/architect/handoff.md § WIFI_FACTORY_RESET_MDNS_SAFE
+  - tester Run 025 / TESTER_RETURN_FACTORY_RESET_MDNS_HANG
+  - docs/wifi_factory_reset_architecture.md (erase→portal before discovery stop)
+Summary:
+  Root cause: factory_reset_runtime_sequence called device_discovery_stop()
+  before erase; mdns_unregister_netif hung while STA+mDNS active so NVS erase
+  and portal never ran.
+  Fix: remove pre-erase discovery_stop; rely on AP_STARTED/PORTAL_READY
+  reason=portal. Harden device_discovery_stop to clear local state only
+  (skip mdns_unregister_netif) so stop returns in bounded time.
+Modified files:
+  - components/app_core/app_core_wifi.c
+  - components/device_discovery/device_discovery.c
+  - docs/wifi_factory_reset_implementation_reference.md
+  - agent-workspaces/implementer/handoff.md
+Commands executed:
+  - bash -lc 'source /home/libertad/esp/esp-idf/export.sh && idf.py build'
+Build result:
+  - PASS (ESP-IDF 5.3, esp32c3)
+  - b00_basehil_firmware.bin size 0xe8df0 bytes
+Questions or technical debt:
+  - None for this handoff.
+Ready for tester:
+  Yes. Flash; STA connected + mDNS → GPIO7 ≥10 s; expect erase + portal logs
+  without hang; reboot must not rejoin old AP. Regress Run 021 portal reset.
+Status: Complete (2026-11-03); tester validation pending.
+```
+
+## BASE_REMOVE_INA219_MACROS
+
+```text
+Role boundary check:
+  Human directed implementer cleanup. Aligns board_pins.h with existing
+  architect docs (b00_basehil MUST NOT require INA219 macros). No docs edits.
+ID: BASE_REMOVE_INA219_MACROS
+Date: 2026-11-03
+Source:
+  - Human: remove INA chip usage from base firmware; keep I2C architecture
+  - docs/i2c_bus_architecture.md (INA219 optional / daughter-board only)
+Summary:
+  No runtime INA probe/driver existed. Only remnant was unused address macros
+  in components/board/include/board_pins.h. Removed those three defines.
+  Preserved i2c_bus, OLED 0x3C/0x3D policy, and app_core I2C startup.
+Modified files:
+  - components/board/include/board_pins.h
+  - agent-workspaces/implementer/handoff.md
+Commands executed:
+  - code search for BOARD_INA219 / ina219 in main/ and components/
+Build result:
+  - Not rebuilt (header-only unused-macro removal; no callers)
+Questions or technical debt:
+  - Daughter boards that need INA219 must define their own BOARD_INA219_*
+    (or equivalent) in their board component.
+Ready for tester:
+  Optional smoke: boot still probes OLED only; no INA logs expected.
+Status: Complete (2026-11-03).
+```
 
 ## ERROR_LED_RUNTIME_LINK_STATUS
 

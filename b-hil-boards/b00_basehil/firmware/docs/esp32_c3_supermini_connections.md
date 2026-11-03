@@ -17,14 +17,15 @@ Source handoff: `agent-workspaces/architect/handoff.md`,
 
 ## I2C Bus
 
-`GPIO0` and `GPIO1` form one shared I2C bus. The 0.96 inch I2C OLED display and
-the three `INA219` current monitor devices are connected to this same bus.
+`GPIO0` and `GPIO1` form one shared I2C bus.
+
+### Minimum base test profile (normative for `b00_basehil` bench)
+
+The human-supervised base bring-up bench uses **OLED only** on this bus. See
+`docs/board_hardware_description.md`.
 
 | Device | I2C address |
 | --- | --- |
-| `INA219_0` | `0x40` |
-| `INA219_1` | `0x41` |
-| `INA219_2` | `0x42` |
 | `OLED_0_96_I2C` | `0x3C` or `0x3D` |
 
 The OLED driver or board configuration must allow either common OLED address:
@@ -33,6 +34,23 @@ these two expected OLED addresses.
 
 **Controller IC (v1):** SSD1306, 128×64, I2C. Validated on bench hardware. SH1106
 is out of scope unless the physical module changes.
+
+### Optional / daughter-board I2C devices (not on the base test bench)
+
+Product HIL boards (`bNN_hil`) MAY add further slaves on the same shared-bus
+architecture (for example three `INA219` at `0x40`, `0x41`, `0x42`, or other
+I2C devices). Those devices are **not** part of the `b00_basehil` minimum test
+profile. Document them only in that board's
+`docs/board_hardware_description.md` and optional device components.
+
+Historical address set used in early INA219 experiments (daughter-board
+example only):
+
+| Device (example) | I2C address |
+| --- | --- |
+| `INA219_0` | `0x40` |
+| `INA219_1` | `0x41` |
+| `INA219_2` | `0x42` |
 
 ## Digestible Wiring Schematic
 
@@ -49,24 +67,27 @@ is out of scope unless the physical module changes.
                     |                     |
                     +---------------------+
 
-Shared I2C SCL/SDA bus:
+Shared I2C SCL/SDA bus (minimum base test profile):
 
-    GPIO0 / SCL ----------------+----------------+----------------+----------------+
-                                |                |                |                |
-                              OLED            INA219           INA219           INA219
-                           0x3C or 0x3D        0x40             0x41             0x42
-                                |                |                |                |
-    GPIO1 / SDA ----------------+----------------+----------------+----------------+
+    GPIO0 / SCL ----------------+
+                                |
+                              OLED
+                           0x3C or 0x3D
+                                |
+    GPIO1 / SDA ----------------+
 
-Power and reference:
+    (Daughter boards MAY attach more I2C slaves on the same bus architecture;
+     they are not shown here because they are not part of the base test bench.)
 
-    Positive rail -------------+-------------+-------------+-------------+
-                               |             |             |             |
-                              OLED          INA219        LED          GPIO7 pull-up
+Power and reference (minimum profile):
 
-    GND -----------------------+-------------+-------------+-------------+
+    Positive rail -------------+-------------+-------------+
                                |             |             |
-                              OLED          INA219        ESP32-C3 GND
+                              OLED          LED          GPIO7 pull-up
+
+    GND -----------------------+-------------+
+                               |             |
+                              OLED        ESP32-C3 GND
 
 Active-low discrete signals:
 
@@ -83,8 +104,11 @@ Active-low discrete signals:
 
 - `GPIO0` is the only confirmed SCL pin for this board target.
 - `GPIO1` is the only confirmed SDA pin for this board target.
-- The OLED display and all three `INA219` devices share the same I2C bus.
-- The `INA219` devices use fixed expected addresses `0x40`, `0x41`, and `0x42`.
+- On the **minimum base test profile**, only the OLED is required on the shared
+  I2C bus.
+- Extra I2C slaves (INA219 or others) belong to daughter-board hardware docs and
+  optional components; they MUST NOT be treated as required for `b00_basehil`
+  bring-up.
 - The OLED display address is valid only when it is `0x3C` or `0x3D`.
 - `GPIO8` must be modeled as an active-low output.
 - Product WiFi link status drives the error LED via `wifi_link_status_t` and
@@ -107,9 +131,12 @@ BOARD_ERROR_LED_ACTIVE_LEVEL = 0
 BOARD_FACTORY_RESET_GPIO = GPIO7
 BOARD_FACTORY_RESET_ACTIVE_LEVEL = 0
 
-BOARD_INA219_ADDRESSES = [0x40, 0x41, 0x42]
 BOARD_OLED_ALLOWED_ADDRESSES = [0x3C, 0x3D]
 ```
+
+Daughter boards that use INA219 (or other I2C devices) define their own address
+macros in that board's `components/board/` and hardware description. Those
+macros are not required on the `b00_basehil` minimum test profile.
 
 These constants are board details. Display rendering code must not depend on
 GPIO numbers directly; it should receive hardware details from board or driver

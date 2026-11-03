@@ -3,12 +3,17 @@
 Normative contract for erasing WiFi credentials (`wifi_prov` NVS namespace) via the
 `GPIO7` factory reset switch and returning the device to the provisioning portal.
 
-Source handoff: `WIFI_FACTORY_RESET_RUNTIME`. Operator validation: Run 021 (2026-06-23).
+Source handoff: `WIFI_FACTORY_RESET_RUNTIME`. Operator validation: Run 021 (2026-06-23)
+portal/connect-cycle path. **STA + mDNS path:** tester Run 025 (2026-11-03) FAIL —
+see `TESTER_RETURN_FACTORY_RESET_MDNS_HANG` and normative rules below (supersede any
+as-built that blocks erase behind `device_discovery_stop`).
 
 Related:
 
-- **`docs/wifi_factory_reset_implementation_reference.md`** — **as-built source of truth**
-  (function names, monitor algorithm, abort integration, logs, Run 021 matrix)
+- **`docs/wifi_factory_reset_implementation_reference.md`** — as-built reference
+  (Run 021 matrix); must be updated after the STA+mDNS fix
+- `docs/device_discovery_mdns_architecture.md` — mDNS stop on factory reset /
+  portal; must not block erase
 - `docs/wifi_provisioning_architecture.md` — NVS contract, portal startup, events
 - `docs/wifi_connect_cycle_architecture.md` — connect cycle v2 (must abort on reset)
 - `docs/wifi_connect_cycle_implementation_reference.md` — as-built cycle engine
@@ -35,7 +40,7 @@ This contract covers:
 | Situation | Button action | Result |
 | --- | --- | --- |
 | No credentials in NVS | Hold `GPIO7` ≥ 10 s | Erase (no-op on NVS); portal remains or restarts; LED solid ON |
-| STA connected | Hold ≥ 10 s | Erase NVS; stop STA; open provisioning AP + HTTP; OLED setup UX |
+| STA connected (with or without mDNS announcing) | Hold ≥ 10 s | Erase NVS; stop STA/mDNS announcement; open provisioning AP + HTTP; OLED setup UX; **MUST NOT hang** |
 | Connect cycle active (boot or runtime) | Hold ≥ 10 s | Abort cycle within bounded time; erase; portal |
 | Runtime reconnect task active | Hold ≥ 10 s | Cancel task; erase; portal |
 | Portal already active | Hold ≥ 10 s | Erase (idempotent); refresh portal UX |
@@ -48,6 +53,8 @@ Cross-cutting rules:
 - Erase MUST call `wifi_credentials_erase()` (full `wifi_prov` namespace + commit).
 - After erase, `wifi_credentials_load()` MUST return false.
 - MUST NOT `esp_restart()` on the success path unless soft transition to portal fails.
+- **Erase and portal transition MUST NOT be blocked** behind a synchronous mDNS /
+  `device_discovery_stop()` call that can hang while STA is still up (Run 025).
 - MUST NOT leave STA connect cycle running after credentials are erased.
 
 ## Hardware input
@@ -135,19 +142,48 @@ See implementation reference for exact loop pseudocode.
 
 ### Runtime reset sequence
 
-Executed only from `factory_reset_monitor_task` (not from WiFi event handlers):
+Executed only from `factory_reset_monitor_task` (not from WiFi event handlers).
+
+**Normative order (product-critical steps first):**
 
 ```text
 1. Log: app_core_wifi: factory reset requested (runtime)
 2. err = wifi_credentials_erase()
    - on failure: log and return (no portal transition)
 3. err = wifi_provisioning_factory_reset_to_portal()
+   - aborts connect cycle, disconnects/stops STA, starts SoftAP + HTTP
    - on failure: log; optional esp_restart() only as last resort (see non-goals)
 4. Log: app_core_wifi: factory reset complete portal_active=true
+5. mDNS / device_discovery stop — see rules below (MUST NOT run as a blocking
+   step before 2–4)
 ```
 
 `app_core_wifi` orchestrates erase + provisioning transition. `wifi_credentials` owns
 NVS; `wifi_provisioning` owns WiFi/HTTP mode changes.
+
+### mDNS / device_discovery interaction (normative)
+
+Tester Run 025: as-built called `device_discovery_stop("factory_reset")` **before**
+erase while STA+mDNS were active; hang inside `mdns_unregister_netif` prevented
+erase and portal. That ordering is **forbidden**.
+
+Rules for the implementer:
+
+1. **MUST NOT** call a blocking `device_discovery_stop()` (or any mDNS unregister
+   that can hang) **before** `wifi_credentials_erase()` and
+   `wifi_provisioning_factory_reset_to_portal()`.
+2. Preferred: rely on the existing portal path — when SoftAP starts,
+   `app_core_wifi` already stops discovery on `AP_STARTED` / `PORTAL_READY` with
+   reason `portal` (`docs/device_discovery_mdns_architecture.md`). That is
+   sufficient for v1 product behavior.
+3. If an explicit `factory_reset` stop reason is still desired, call
+   `device_discovery_stop("factory_reset")` only **after** STA has been stopped
+   (after or inside step 3), and the stop path MUST return in bounded time.
+4. `device_discovery_stop()` MUST be idempotent and MUST NOT hang indefinitely
+   when called with STA/mDNS still active; if ESP-IDF unregister can block in that
+   state, skip the blocking unregister and ensure announcement ends when WiFi
+   stops / portal starts.
+5. Failure or skip of discovery stop MUST NOT prevent erase + portal success.
 
 ### `wifi_provisioning_factory_reset_to_portal()`
 

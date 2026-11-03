@@ -35,7 +35,7 @@ code as authorized):
 | --- | --- | --- |
 | 1. WiFi onboarding | Provisioning SoftAP/portal, credential storage, connect/failure/reconnect/factory-reset contracts shared by the family | `docs/wifi_provisioning_architecture.md` and related WiFi/LED docs |
 | 2. Network board detection | Mechanism/protocol to find boards on the LAN (mDNS / identity) | `docs/device_discovery_mdns_architecture.md` |
-| 3. External host communication | Methodology (API, protocol, versioning) for an external LLM or application to talk to each board | `docs/external_host_api_architecture.md` |
+| 3. External host communication | Methodology (API, protocol, versioning) for an external LLM or application to talk to each board | `docs/external_host_api_architecture.md`, `docs/external_host_command_api.md`, `docs/external_host_stream_api.md` |
 
 Full delimiter of base vs particular, including support contracts (display, I2C,
 methodology): **`docs/hil_base_platform_scope.md`**.
@@ -117,7 +117,9 @@ board session remains self-contained for agents while behavior stays aligned.
 
 | Area | Normative document |
 | --- | --- |
-| Host API / protocol methodology | `docs/external_host_api_architecture.md` |
+| Host API overview / two planes | `docs/external_host_api_architecture.md` |
+| Slow commands (HTTP JSON) | `docs/external_host_command_api.md` |
+| Binary streams (HTTP write/read + Base64) | `docs/external_host_stream_api.md` |
 
 ### Support contracts (base-owned)
 
@@ -216,9 +218,9 @@ move.
 - Duplicating full base docs inside each board repo as a maintained fork.
 - Treating this base as a non-buildable docs-only package; it remains a flashable
   reference project for the base hardware profile.
-- Requiring every family board to ship every base peripheral (for example INA219)
-  when the board PCB omits them; optional components stay optional per
-  `docs/architecture.md`.
+- Requiring every family board to ship every peripheral. Extra I2C devices such
+  as INA219 are daughter-board options; the base test profile is OLED-oriented
+  and may omit them without changing `i2c_bus` (`docs/i2c_bus_architecture.md`).
 - Reviving retired display visual demos as product boot UX.
 - Defining board-SKU HIL product semantics inside base pillar files.
 

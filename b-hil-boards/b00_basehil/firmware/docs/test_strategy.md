@@ -343,7 +343,10 @@ Applies after STA obtains IPv4 on the user LAN. Spec:
 - `XXXX` matches SoftAP SSID suffix from provisioning (SoftAP MAC4, not STA MAC).
 - Fresh NVS portal boot: no `mdns start` until STA connects to home network.
 - WiFi outage during runtime: `mdns stop reason=link_lost`; restart after GOT_IP.
-- Factory reset to portal: `mdns stop reason=factory_reset`.
+- Factory reset to portal: mDNS announcement ends; serial MAY show
+  `mdns stop reason=portal` and/or `mdns stop reason=factory_reset` (portal path
+  after SoftAP start is acceptable). MUST NOT hang with no further logs after
+  `factory reset requested (runtime)`.
 - v1: hostname-only; no requirement to browse `_http._tcp` or custom service types.
 
 ### Reboot and recovery
@@ -366,13 +369,24 @@ Applies after STA obtains IPv4 on the user LAN. Spec:
   provisioning accepted on the current bench.
 - Reboot with saved but unreachable or invalid credentials does not erase NVS and
   does not reopen AP; the device remains in connect cycle until factory reset.
+- After STA connect, OLED connected screen shows five lines: `WIFI OK`, mDNS
+  identity hostname without `.local` (matches SoftAP/mDNS), full STA IPv4, and
+  split STA MAC (`OLED_CONNECTED_MDNS_HOSTNAME_LINE`). Hostname and IP must not
+  be truncated for valid `HIL-00-XXXX` / IPv4 strings.
 - Holding `GPIO7` active-low for at least `10000 ms` (10 s) erases NVS namespace
   `wifi_prov` and starts AP provisioning again (boot or runtime per
   `docs/wifi_factory_reset_architecture.md`).
-- **Run 021 validated:** runtime reset from connect cycle, portal idempotent 2×,
-  reprovision after reset (Entry 024).
-- **Deferred follow-up (non-blocking v1):** boot hold 10 s, boot short-press negative,
-  reset from stable `WIFI OK` only.
+- **Mandatory regression (Run 025 gap):** while STA is connected **and** mDNS is
+  announcing (`mdns start` already logged), hold `GPIO7` ≥ 10 s. Expect:
+  - serial `factory reset requested (runtime)` then erase + portal completion
+    logs (no indefinite hang / silent UART);
+  - NVS cleared (`wifi_credentials_load` false; reboot does not rejoin home AP
+    with old creds);
+  - SoftAP provisioning portal active; OLED setup UX.
+- **Run 021 validated:** runtime reset from connect cycle / portal (mDNS not
+  announcing); portal idempotent 2×; reprovision after reset (Entry 024).
+  Re-run as regression after the STA+mDNS fix.
+- **Deferred follow-up (non-blocking v1):** boot hold 10 s, boot short-press negative.
 - A short or released `GPIO7` input before 10 s must not erase credentials.
 
 ### WiFi provisioning test record additions

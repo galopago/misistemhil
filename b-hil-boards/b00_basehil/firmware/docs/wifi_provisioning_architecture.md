@@ -183,6 +183,7 @@ typedef enum {
     WIFI_PROV_EVENT_PORTAL_READY,
     WIFI_PROV_EVENT_SUBMITTED_CONNECTING,
     WIFI_PROV_EVENT_SUBMITTED_SUCCESS,
+    WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE,
     WIFI_PROV_EVENT_SUBMITTED_FAILURE,
     WIFI_PROV_EVENT_SAVED_CONNECTING,
     WIFI_PROV_EVENT_SAVED_SUCCESS,
@@ -883,9 +884,23 @@ wifi_prov: SoftAP stopped after provisioning success
 wifi_prov: STA-only mode active after provisioning success
 ```
 
+- After SoftAP httpd is stopped, STA-only mode is set, and `s_portal_active` is
+  false, emit **`WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE`** (new event). This is
+  the signal that port **80** is free for the STA host API. Do **not** make
+  `wifi_provisioning` call `host_api_*` directly (no component dependency).
+- `app_core` MUST handle `WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE`: if
+  `link_status == CONNECTED`, call `host_api_start()` and **log failures**
+  (`ESP_LOGE`); silent `(void)` discard of the final start is forbidden.
+- Rationale: `SUBMITTED_SUCCESS` / early `CONNECTED` happens while SoftAP httpd
+  still owns `:80` (grace window). Starting host API only then races and can
+  leave `/v1` dead until reboot (Run 029). See
+  `docs/external_host_api_architecture.md` § Port 80 exclusivity.
 - Tester acceptance requires the AP to disappear or stop accepting new
   associations after teardown, not necessarily instantly at the moment the success
   page appears.
+- Tester acceptance also requires: after POST success **without reboot**, once
+  teardown completes, TCP `:80` accepts and `POST /v1/command` `ping` works
+  (bounded: grace delay + ~1 s).
 
 ### Saved credential reboot proof
 

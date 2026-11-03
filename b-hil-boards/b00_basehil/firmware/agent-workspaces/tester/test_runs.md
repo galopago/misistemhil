@@ -490,6 +490,204 @@ Conclusion:
   See feedback.md Entry 007.
 ```
 
+### Run 031 — HOST_API power-cycle / saved-boot regression
+
+```text
+Date: 2026-11-03
+Firmware: 0xf3730 HOST_API_AFTER_PORTAL_TEARDOWN
+Hardware: HIL-00-24CE @ 192.168.1.10 after operator power cycle
+Commands: avahi-resolve; TCP :80; curl ping/info/echo; loopback
+Result: all PASS (no RTS reset)
+Conclusion: PASS saved-boot regression. /tmp/b00_host_api_run031_power_cycle.txt
+```
+
+### Run 030 — HOST_API_AFTER_PORTAL_TEARDOWN
+
+```text
+Date: 2026-11-03
+Firmware: 10e21ad-dirty 0xf3730 HOST_API_AFTER_PORTAL_TEARDOWN
+Hardware: HIL-00-24CE @ 192.168.1.10 after erase + reprovision (no RTS reset)
+Commands: avahi-resolve; TCP :80; curl /v1/command + loopback
+Result:
+  :80 OPEN: PASS (Run 029 was refused)
+  ping/info/echo + loopback AQID: PASS
+Conclusion: PASS. Closes TESTER_RETURN_HOST_API_AFTER_PROVISION.
+  See feedback.md Entry 034; /tmp/b00_host_api_run030_post_provision.txt
+```
+
+### Run 029 — host API missing after POST provision
+
+```text
+Date: 2026-11-03
+Firmware: 10e21ad-dirty 0xf3590 HOST_API_CAPABILITIES_ECHO_LOOPBACK
+Hardware: HIL-00-24CE STA 192.168.1.10 (operator OLED WIFI OK)
+Method: no RTS reset; avahi-resolve + ping + TCP port probe + curl
+Result:
+  mDNS + ICMP: PASS
+  OLED WIFI OK (operator): PASS
+  TCP :80 host API: FAIL (connection refused)
+  /v1/command: FAIL
+Contrast: Run 028 saved-boot path PASS with host_api started
+Conclusion:
+  FAIL post-reprovision host API lifecycle. Return to architect
+  TESTER_RETURN_HOST_API_AFTER_PROVISION (portal httpd vs host_api port 80 race).
+  See feedback.md Entry 033.
+```
+
+### Run 028 — HOST_API_CAPABILITIES_ECHO_LOOPBACK
+
+```text
+Date: 2026-11-03
+Firmware: 10e21ad-dirty, b00_basehil_firmware.bin 0xf3590
+Handoff: HOST_API_CAPABILITIES_ECHO_LOOPBACK
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini /dev/ttyACM0; STA 192.168.1.10; HIL-00-24CE.local
+Commands:
+  curl POST /v1/command ping, info, capabilities, echo
+  curl POST /v1/stream/open loopback → write AQID → read → close
+Result:
+  Boot host_api started after mdns: PASS
+  ping/info/capabilities/echo: PASS
+  loopback FIFO AQID round-trip: PASS
+  SoftAP /v1 absent: NOT EXERCISED
+Logs: /tmp/b00_host_api_run028_{boot,results,loopback}.txt
+Conclusion:
+  PASS for HOST_API_CAPABILITIES_ECHO_LOOPBACK (STA path).
+  See feedback.md Entry 032.
+```
+
+### Run 027 — OLED_CONNECTED_IP_WIDTH_FIT
+
+```text
+Date: 2026-11-03
+Firmware: commit 10e21ad-dirty, b00_basehil_firmware.bin 0xe8df0
+Handoff: OLED_CONNECTED_IP_WIDTH_FIT (implementer)
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+Commands:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  Static font budget audit (MEDIUM 8 px → ≤15 chars/line)
+  Operator provision + OLED visual check
+Result:
+  Build/flash: PASS
+  Code FULL_FOUR_LINES → DISPLAY_FONT_MEDIUM: PASS
+  Operator visual full IPv4 (no truncation): PASS — Entry 031
+Conclusion:
+  PASS for OLED_CONNECTED_IP_WIDTH_FIT.
+  See feedback.md Entry 031.
+```
+
+### Run 026 — WIFI_FACTORY_RESET_MDNS_SAFE
+
+```text
+Date: 2026-11-03
+Firmware: commit 10e21ad-dirty, b00_basehil_firmware.bin 0xe8df0
+Handoff: WIFI_FACTORY_RESET_MDNS_SAFE (implementer)
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+          Precondition: STA openwrt-iot 192.168.1.11 + mDNS HIL-00-F06F
+Commands:
+  idf.py build && idf.py -p /dev/ttyACM0 flash
+  Serial 60s GPIO7 hold -> /tmp/b00_basehil_boot_log_run026_factory_reset_mdns_safe.txt
+  Host reboot 15s -> /tmp/b00_basehil_boot_log_run026_after_reset_reboot.txt
+Result:
+  Build/flash: PASS (0xe8df0)
+  Hold detect runtime: PASS
+  abort + stopping wifi + SoftAP portal: PASS (~120 ms, no hang)
+  factory reset complete portal_active=true: PASS
+  mdns stop reason=portal after WiFi stop: PASS
+  NVS erased (reboot SoftAP, no STA got IP): PASS
+Logs (hold):
+  I (5273) wifi_prov: STA got IP ip=192.168.1.11 source=boot attempt=1/5
+  I (5283) device_discovery: mdns start hostname=HIL-00-F06F
+  W (18973) app_core_wifi: factory reset requested (runtime)
+  I (18983) wifi_prov: factory reset abort connect cycle
+  I (18983) wifi_prov: factory reset stopping wifi
+  I (19053) wifi_prov: SoftAP started
+  I (19063) device_discovery: mdns stop reason=portal
+  I (19083) wifi_prov: provisioning portal ready at http://192.168.4.1
+  I (19093) app_core_wifi: factory reset complete portal_active=true
+Logs (reboot):
+  I (633) wifi_prov: starting SoftAP ssid=HIL-00-F06F mode=AP
+  I (753) wifi_prov: provisioning portal ready at http://192.168.4.1
+Conclusion:
+  PASS for WIFI_FACTORY_RESET_MDNS_SAFE. Closes Run 025 hang.
+  See feedback.md Entry 030.
+```
+
+### Run 025 — WIFI_FACTORY_RESET_RUNTIME STA+mDNS hang
+
+```text
+Date: 2026-11-03
+Firmware: commit 10e21ad-dirty, b00_basehil_firmware.bin 0xe8e80
+Handoff: WIFI_FACTORY_RESET_RUNTIME (operator regression)
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+          Saved STA openwrt-iot → 192.168.1.11; mDNS HIL-00-F06F
+NVS at test start: provisioned (openwrt-iot)
+Commands:
+  Serial 45s during GPIO7 hold -> /tmp/b00_basehil_boot_log_run025_factory_reset_hold.txt
+  Host RTS reset + 18s boot -> /tmp/b00_basehil_boot_log_run025_after_failed_reset.txt
+Result:
+  GPIO7 hold ≥10 s detected: PASS (runtime log)
+  mdns stop after factory reset: FAIL (log absent)
+  wifi_credentials_erase / portal transition: FAIL (never reached)
+  Serial hang after W factory reset requested (runtime): FAIL
+  NVS cleared: FAIL (post-reset reboot reconnects STA + mdns)
+Logs (hold capture):
+  I (5312) wifi_prov: STA got IP ip=192.168.1.11 source=boot attempt=1/5
+  I (5322) device_discovery: mdns start hostname=HIL-00-F06F
+  W (23462) app_core_wifi: factory reset requested (runtime)
+  <no further lines>
+Logs (after host reset):
+  I (5412) wifi_prov: STA got IP ip=192.168.1.11 source=boot attempt=1/5
+  I (5422) device_discovery: mdns start hostname=HIL-00-F06F
+Conclusion:
+  FAIL. Button works; runtime sequence hangs inside device_discovery_stop()
+  (mdns_unregister_netif) before erase/portal. Return to implementer/architect.
+  See feedback.md Entry 029; tester/handoff.md TESTER_RETURN_FACTORY_RESET_MDNS_HANG.
+```
+
+### Run 024 — BASE_REMOVE_INA219_MACROS smoke
+
+```text
+Date: 2026-11-03
+Firmware: commit 10e21ad-dirty, b00_basehil_firmware.bin 0xe8e80
+Handoff: BASE_REMOVE_INA219_MACROS (implementer)
+ESP-IDF: v5.3.4
+Hardware: ESP32-C3 SuperMini on /dev/ttyACM0, OLED @ 0x3C
+          SoftAP MAC 8c:d0:b2:a7:f0:6f → HIL-00-F06F
+Scope: post-INA-macro-removal smoke (build/flash/boot; OLED I2C; no INA)
+Commands:
+  source ~/esp/esp-idf/export.sh
+  idf.py build
+  idf.py -p /dev/ttyACM0 flash
+  Serial capture 20s (RTS reset) -> /tmp/b00_basehil_boot_log_run024_ina_removed.txt
+  strings/bin + rg audit for BOARD_INA219 / ina219
+Result:
+  Build: PASS (0xe8e80)
+  Flash: PASS (ESP32-C3 /dev/ttyACM0)
+  Source audit no BOARD_INA219/ina219 in main/ or components/: PASS
+  Binary strings no ina219/BOARD_INA: PASS
+  Boot stable (no panic / reboot loop): PASS
+  I2C bus ready GPIO0/GPIO1 @ 400 kHz: PASS
+  OLED probe/register at 0x3C + SSD1306 init: PASS
+  SoftAP portal HIL-00-F06F @ http://192.168.4.1: PASS
+  Serial INA / 0x40–0x42 probe logs: PASS (absent)
+Logs (/tmp/b00_basehil_boot_log_run024_ina_removed.txt):
+  I (402) app_core: Board: b00_basehil
+  I (402) app_core: I2C SCL GPIO0 SDA GPIO1
+  I (432) i2c_bus: I2C bus ready on SCL GPIO0 SDA GPIO1 at 400000 Hz
+  I (442) app_core: OLED detected at I2C address 0x3C
+  I (452) display_driver: SSD1306 initialized at I2C address 0x3C
+  I (622) wifi_prov: provisioning AP SSID generated ssid=HIL-00-F06F
+  I (732) wifi_prov: provisioning portal ready at http://192.168.4.1
+Conclusion:
+  PASS smoke for BASE_REMOVE_INA219_MACROS.
+  Removing unused INA219 address macros from board_pins.h does not break
+  build, flash, I2C bus, OLED path, or provisioning SoftAP boot.
+```
+
 ### Run 023 — DEVICE_DISCOVERY_MDNS_V1
 
 ```text

@@ -107,3 +107,130 @@ Required particular-repo actions:
     created or updated accordingly.
 Code impact in base tree: none for this documentation change.
 ```
+
+### BASE-CHANGE-20261103-1
+
+```text
+ID: BASE-CHANGE-20261103-1
+Date: 2026-11-03
+Summary: Clarify that extra I2C product devices (INA219 example) belong on
+  daughter boards; b00_basehil minimum test profile is OLED-only on the shared
+  bus. i2c_bus remains device-agnostic and unchanged.
+Pillars affected:
+  - Support contract: I2C bus ownership split (bus base / slaves particular)
+Affected base docs:
+  - docs/i2c_bus_architecture.md
+  - docs/esp32_c3_supermini_connections.md
+  - docs/architecture.md
+  - docs/hil_base_platform_scope.md
+  - docs/hil_base_reuse_contract.md
+  - docs/hil_board_particular_spec_template.md
+Required particular-repo actions:
+  - If the board has INA219 or other extra I2C slaves, list them only in
+    board_hardware_description.md (and board component macros).
+  - Do not treat INA219 as required because early base experiments mentioned it.
+  - Record this ID as consumed in the board sync log.
+Code impact in base tree: none (documentation only; drivers untouched).
+```
+
+### BASE-CHANGE-20261103-2
+
+```text
+ID: BASE-CHANGE-20261103-2
+Date: 2026-11-03
+Summary: Specify family external host API v1 concept — HTTP JSON slow commands
+  and TCP length-prefixed binary streams (control vs data planes).
+Pillars affected:
+  - External host communication (pillar 3)
+Affected base docs:
+  - docs/external_host_api_architecture.md (filled)
+  - docs/external_host_command_api.md (new)
+  - docs/external_host_stream_api.md (new)
+  - docs/hil_base_platform_scope.md
+  - docs/hil_base_reuse_contract.md
+  - docs/architecture.md
+  - docs/hil_board_particular_spec_template.md
+  - docs/board_host_api_extensions.md
+Required particular-repo actions:
+  - Read the three host API docs; do not invent a parallel protocol.
+  - Update board_host_api_extensions.md using the new template sections
+    (extra commands / streams).
+  - Record this ID as consumed in the board sync log.
+Code impact in base tree: none yet (docs only; firmware pending
+  EXTERNAL_HOST_API_V1_CONCEPT).
+```
+
+### BASE-CHANGE-20261103-3
+
+```text
+ID: BASE-CHANGE-20261103-3
+Date: 2026-11-03
+Summary: Revise host API data plane for agent-primary client — replace raw TCP
+  :9000 with HTTP JSON stream write/read (Base64, bounded timeouts).
+Pillars affected:
+  - External host communication (pillar 3)
+Affected base docs:
+  - docs/external_host_api_architecture.md
+  - docs/external_host_stream_api.md
+  - docs/external_host_command_api.md
+  - docs/hil_base_platform_scope.md
+  - docs/hil_base_reuse_contract.md
+  - docs/architecture.md
+  - docs/hil_board_particular_spec_template.md
+  - docs/board_host_api_extensions.md
+Required particular-repo actions:
+  - Re-read stream API; drop any assumption of TCP 9000 / length-prefix framing.
+  - Keep board_host_api_extensions.md aligned with open/close/write/read +
+    Base64 frame limits.
+  - Record this ID as consumed in the board sync log.
+Code impact in base tree: none yet (docs only; firmware still pending).
+```
+
+### BASE-CHANGE-20261103-4
+
+```text
+ID: BASE-CHANGE-20261103-4
+Date: 2026-11-03
+Summary: Mandatory capabilities (ask-the-board manifest); b00_basehil reference
+  demos echo command + loopback stream.
+Pillars affected:
+  - External host communication (pillar 3)
+Affected base docs:
+  - docs/external_host_api_architecture.md
+  - docs/external_host_command_api.md
+  - docs/external_host_stream_api.md
+  - docs/hil_base_platform_scope.md
+  - docs/architecture.md
+  - docs/hil_board_particular_spec_template.md
+  - docs/board_host_api_extensions.md
+Required particular-repo actions:
+  - Implement or stub capabilities in firmware when adopting host API; agents
+    must not rely on reading repo Markdown for discovery.
+  - Do not assume echo/loopback exist unless listed in that board's on-device
+    capabilities (they are b00_basehil demos, not family-mandatory).
+  - Update board_host_api_extensions.md checklist to match firmware manifest.
+  - Record this ID as consumed in the board sync log.
+Code impact in base tree: none yet (docs only; firmware pending
+  HOST_API_CAPABILITIES_ECHO_LOOPBACK).
+```
+
+### BASE-CHANGE-20261103-5
+
+```text
+ID: BASE-CHANGE-20261103-5
+Date: 2026-11-03
+Summary: Fix host API bring-up after POST provision — port 80 exclusivity;
+  emit WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE; start host_api after SoftAP
+  httpd stop (Run 029 / TESTER_RETURN_HOST_API_AFTER_PROVISION).
+Pillars affected:
+  - External host communication (pillar 3)
+  - WiFi onboarding (portal teardown signal)
+Affected base docs:
+  - docs/external_host_api_architecture.md
+  - docs/wifi_provisioning_architecture.md
+Required particular-repo actions:
+  - When adopting host API + SoftAP portal on the same port 80 pattern, absorb
+    PORTAL_TEARDOWN_COMPLETE → host_api_start ordering.
+  - Record this ID as consumed in the board sync log.
+Code impact in base tree: pending implementer HOST_API_AFTER_PORTAL_TEARDOWN.
+```

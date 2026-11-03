@@ -4,7 +4,7 @@
 Board ID: b00_basehil
 Board number: 00
 Base tree referenced: b00_basehil/firmware (this repository)
-Last synced BASE-CHANGE ID: BASE-CHANGE-20261102-3
+Last synced BASE-CHANGE ID: BASE-CHANGE-20261103-5
   (see docs/board_base_sync_log.md)
 
 Pointers (required):
@@ -14,7 +14,8 @@ Pointers (required):
 Base pillars consumed as-is (cite base docs):
   - WiFi onboarding: docs/wifi_provisioning_architecture.md (+ related)
   - Network detection: docs/device_discovery_mdns_architecture.md
-  - External host API: docs/external_host_api_architecture.md (reserved / pending detail)
+  - External host API: docs/external_host_api_architecture.md (+ command/stream
+    siblings; v1 concept; firmware pending)
 
 Particular additions (this repo only):
   - Acts as the family base reference + minimum human-supervised bench profile

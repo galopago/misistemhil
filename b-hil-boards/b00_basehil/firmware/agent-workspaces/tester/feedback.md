@@ -8,6 +8,116 @@ maintained in English.
 
 ## Entries
 
+### Entry 034 — Run 030 host API OK after POST (teardown fix)
+
+```text
+Date: 2026-11-03
+Person: Operator reprovision + tester mDNS/curl (no reset)
+Context: HOST_API_AFTER_PORTAL_TEARDOWN flashed 0xf3730; erase + POST again
+Observed:
+  HIL-00-24CE.local → 192.168.1.10; :80 open; ping/info/echo + loopback PASS.
+Classification: PASS — closes Entry 033 / Run 029.
+```
+
+### Entry 033 — Run 029 host API absent after fresh POST (architect return)
+
+```text
+Date: 2026-11-03
+Person: Operator (factory reset + reprovision) + tester LAN probe without reset
+Context: After Run 028 PASS on saved boot; operator erased creds, POST again;
+  OLED shows WIFI OK + IP; asked tester not to reset to learn IP.
+
+Observed:
+  avahi-resolve HIL-00-24CE.local → 192.168.1.10; ping OK.
+  All probed TCP ports including 80 refused; /v1/command unreachable.
+  Passive SoftAP down; mDNS up; host API not listening.
+
+Classification: FAIL for post-provision host API bring-up.
+  Forward to architect: TESTER_RETURN_HOST_API_AFTER_PROVISION
+  (likely port-80 race with SoftAP httpd before teardown).
+```
+
+### Entry 032 — Run 028 host API command + loopback
+
+```text
+Date: 2026-11-03
+Person: Tester curl on LAN
+Context: HOST_API_CAPABILITIES_ECHO_LOOPBACK; HIL-00-24CE @ 192.168.1.10
+Captures:
+  /tmp/b00_host_api_run028_boot.txt
+  /tmp/b00_host_api_run028_results.txt
+  /tmp/b00_host_api_run028_loopback.txt
+
+Observed:
+  Serial: mdns start then host_api started port=80.
+  ping → pong; info identity HIL-00-24CE; capabilities lists echo+loopback;
+  echo text=hello; loopback write AQID read back AQID; close ok.
+
+Classification: PASS — STA host API demos.
+```
+
+### Entry 031 — Run 027 OLED connected IP no longer truncated
+
+```text
+Date: 2026-11-03
+Person: Operator visual confirmation
+Context: OLED_CONNECTED_IP_WIDTH_FIT after flash 0xe8df0
+  FULL_FOUR_LINES now DISPLAY_FONT_MEDIUM (was AUTO_FIT→LARGE, 10-char budget)
+
+Observed:
+  After provisioning, OLED connected screen shows full STA IPv4 without
+  truncation. Operator accepted visually (2026-11-03).
+
+Classification: PASS — IP width fit on connected OLED.
+```
+
+### Entry 030 — Run 026 factory reset STA+mDNS after MDNS_SAFE fix
+
+```text
+Date: 2026-11-03
+Person: Operator (GPIO7 hold) + tester serial
+Context: WIFI_FACTORY_RESET_MDNS_SAFE re-test of Entry 029 / Run 025
+  Firmware 10e21ad-dirty, bin 0xe8df0
+Captures:
+  /tmp/b00_basehil_boot_log_run026_factory_reset_mdns_safe.txt
+  /tmp/b00_basehil_boot_log_run026_after_reset_reboot.txt
+
+Observed:
+  STA got IP 192.168.1.11 + mdns start HIL-00-F06F.
+  Hold ~10 s → factory reset requested (runtime) @ 18973 ms.
+  Within ~120 ms: abort connect cycle, stopping wifi, SoftAP HIL-00-F06F,
+  mdns stop reason=portal, portal ready, factory reset complete portal_active=true.
+  No hang / silent serial.
+  Host reboot → SoftAP portal only (no STA reconnect) — NVS erased.
+
+Classification: PASS — STA+mDNS factory reset fixed.
+```
+
+### Entry 029 — Run 025 factory reset hang while STA+mDNS connected
+
+```text
+Date: 2026-11-03
+Person: Operator (GPIO7 hold) + tester serial capture
+Context: WIFI_FACTORY_RESET_RUNTIME regression after operator report that
+  credential-erase button does not work as expected. Firmware 10e21ad-dirty
+  (0xe8e80). Device already provisioned on openwrt-iot.
+Captures:
+  /tmp/b00_basehil_boot_log_run025_factory_reset_hold.txt
+  /tmp/b00_basehil_boot_log_run025_after_failed_reset.txt
+
+Observed:
+  Boot saved STA: got IP 192.168.1.11 source=boot; mdns start HIL-00-F06F.
+  Operator held GPIO7 ~10 s while connected.
+  Serial: W app_core_wifi: factory reset requested (runtime) @ 23462 ms.
+  Then silence: no mdns stop, no erase, no portal, no panic log.
+  Host idle listen after hang: 0 bytes until RTS reset.
+  After host reset: STA reconnects openwrt-iot again + mdns start — NVS not erased.
+
+Classification: FAIL — factory reset path hangs when mDNS is active on STA.
+Operator intent: discuss with implementer and improve before re-validation.
+See tester/handoff.md Run 025 + TESTER_RETURN_FACTORY_RESET_MDNS_HANG.
+```
+
 ### Entry 028 — Run 023 LAN mDNS discovery on openwrt-iot
 
 ```text

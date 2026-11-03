@@ -16,6 +16,11 @@ Before starting any task in this file, run the **Role Boundary Check**:
 
 Active handoffs:
 
+- `HOST_API_CAPABILITIES_ECHO_LOOPBACK` (**implementer package closed** 2026-11-03 — firmware pending)
+- `EXTERNAL_HOST_API_V1_CONCEPT` (**docs complete** 2026-11-03 — firmware pending; extended by capabilities/demos)
+- `OLED_CONNECTED_MDNS_HOSTNAME_LINE` (**implemented** 2026-11-03)
+- `OLED_CONNECTED_IP_WIDTH_FIT` (**superseded by** `OLED_CONNECTED_MDNS_HOSTNAME_LINE`)
+- `WIFI_FACTORY_RESET_MDNS_SAFE` (**implemented** 2026-11-03 — Run 025 fix)
 - `OLED_TEXT_DISPLAY_INTERFACE`
 - `I2C_BUS_ARCHITECTURE`
 - `I2C_BUS_CONCURRENCY`
@@ -40,7 +45,8 @@ Active handoffs:
 - `DEVICE_DISCOVERY_MDNS_V1`
 - `HIL_BASE_REUSE_CONTRACT` (**docs complete** 2026-11-02; **pillars extension** 2026-11-02 — no implementer firmware work)
 
-Pending architect review: none.
+- `HOST_API_AFTER_PORTAL_TEARDOWN` (**docs complete** 2026-11-03 — firmware pending;
+  closes `TESTER_RETURN_HOST_API_AFTER_PROVISION` / Run 029)
 
 Family reuse of this base (contracts-first, no submodule) is recorded in
 `docs/hil_base_reuse_contract.md`. Base pillars (WiFi onboarding, network
@@ -212,10 +218,497 @@ Objective:
   specific to b00_basehil ESP32-C3 SuperMini bench.
 Acceptance criteria:
   - Functional doc states base/reference + minimum human-supervised tests.
-  - Hardware doc lists SuperMini, GPIO0/1/7/8, OLED/INA219 addresses from
-    docs/esp32_c3_supermini_connections.md and board_pins.h.
+  - Hardware doc lists SuperMini, GPIO0/1/7/8, OLED addresses (no INA on base
+    test profile) from docs/esp32_c3_supermini_connections.md and board_pins.h.
   - Template notes this tree as the copyable example.
   - BASE-CHANGE-20261102-3 recorded.
+Open questions:
+  - None.
+```
+
+## HOST_API_AFTER_PORTAL_TEARDOWN
+
+```text
+Role boundary check:
+  Architect docs only. Firmware pending implementer.
+ID: HOST_API_AFTER_PORTAL_TEARDOWN
+Date: 2026-11-03
+Source:
+  - Tester Run 029 FAIL / TESTER_RETURN_HOST_API_AFTER_PROVISION
+  - Human: improve architecture so implementer can fix post-reprovision host API
+Objective:
+  Host API must come up after SoftAP portal httpd releases port 80 without
+  requiring a reboot; saved-boot path must keep working.
+Diagnosis (normative):
+  POST /provision success emits CONNECTED while SoftAP httpd still owns :80
+  (2 s grace teardown). host_api_start() bind fails; error discarded; teardown
+  frees port but nothing restarts host_api. Saved boot has no SoftAP httpd → PASS.
+Wire contracts:
+  - docs/external_host_api_architecture.md § Port 80 exclusivity
+  - docs/wifi_provisioning_architecture.md § Deferred AP and HTTP teardown
+  - BASE-CHANGE-20261103-5
+Authorized files (implementer — pending):
+  - components/wifi_provisioning/include/wifi_provisioning.h
+      add WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE
+  - components/wifi_provisioning/wifi_provisioning.c
+      emit that event at end of success_teardown_task after httpd_stop,
+      STA-only mode, s_portal_active=false (do NOT call host_api from here)
+  - components/app_core/app_core_wifi.c
+      on PORTAL_TEARDOWN_COMPLETE + CONNECTED → host_api_start(); log ESP_LOGE
+      on failure; CONNECTED-path host_api_start may WARN if bind fails while
+      portal httpd still up; do not rely on that alone for POST path
+  - agent-workspaces/implementer/handoff.md notes
+Non-goals:
+  - Merging SoftAP and STA into one httpd
+  - Moving host API off port 80 in this fix
+  - Requiring reboot after POST success
+Acceptance (firmware + tester):
+  1. Factory reset + POST provision, NO reboot: after teardown (~2 s + margin),
+     TCP :80 accepts; curl ping on HIL-00-XXXX.local or STA IP succeeds.
+  2. Saved-credential cold boot: host_api started still PASS (Run 028 regression).
+  3. SoftAP portal path: no /v1 while portal httpd up.
+  4. Serial shows host API started after portal teardown on POST path
+     (not only on cold boot).
+Open questions:
+  - None.
+```
+
+## HOST_API_CAPABILITIES_ECHO_LOOPBACK
+
+```text
+Role boundary check:
+  Architect documentation only for this update. Firmware is pending
+  implementer (do not write components/ or main/ from architect role).
+ID: HOST_API_CAPABILITIES_ECHO_LOOPBACK
+Date: 2026-11-03
+Source:
+  - Human: agent must ask the board (not the repo); base FW demos echo +
+    loopback; close handoff so implementer cannot diverge on structure.
+Objective:
+  Implementation-ready family host API + b00 demos (ask-the-board).
+Wire contracts (normative behavior):
+  - docs/external_host_api_architecture.md
+  - docs/external_host_command_api.md
+  - docs/external_host_stream_api.md
+  - docs/board_host_api_extensions.md
+Follow-on: HOST_API_AFTER_PORTAL_TEARDOWN required before POST-provision
+  path is accepted (Run 029).
+```
+
+### Implementer package (firmware — PENDING)
+
+Temporary shared-file owner for this handoff: **implementer**.
+
+#### Expected new files
+
+```text
+components/host_api/CMakeLists.txt
+components/host_api/include/host_api.h
+components/host_api/host_api.c              # httpd lifecycle + route registration
+components/host_api/host_api_command.c      # POST /v1/command dispatch + handlers
+components/host_api/host_api_stream.c       # POST /v1/stream/* + loopback queue
+components/host_api/host_api_capabilities.c # embedded b00 manifest (const data)
+```
+
+Do **not** put host API handlers inside `wifi_provisioning` or `display`.
+Do **not** add routes to the SoftAP portal httpd instance.
+
+#### Expected edited files
+
+```text
+components/app_core/CMakeLists.txt          # REQUIRES host_api
+components/app_core/app_core_wifi.c         # start/stop host_api with discovery window
+agent-workspaces/implementer/handoff.md     # record implementation notes
+```
+
+`main/` stays thin: no host_api calls from `app_main.c` (orchestration stays in
+`app_core`).
+
+#### Public C API (`host_api.h`)
+
+```c
+#pragma once
+#include "esp_err.h"
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** Start STA host API HTTP server on port 80. Idempotent if already running. */
+esp_err_t host_api_start(void);
+
+/**
+ * Stop host API, close any stream session, free RX queue.
+ * reason: short log tag only ("link_lost", "portal", "shutdown", …).
+ * Idempotent if already stopped.
+ */
+esp_err_t host_api_stop(const char *reason);
+
+bool host_api_is_running(void);
+
+#ifdef __cplusplus
+}
+#endif
+```
+
+No other public symbols required in v1.
+
+#### HTTP stack (decided)
+
+- Use **ESP-IDF `esp_http_server`** (`httpd_*`), same family as SoftAP portal but
+  a **separate** `httpd_handle_t` owned by `host_api`.
+- Listen on port **80** only while STA has IPv4 (portal SoftAP also uses 80; the
+  two modes MUST never run concurrently — same rule as today for portal vs STA).
+- Register URI handlers (method POST):
+  - `/v1/command`
+  - `/v1/stream/open`
+  - `/v1/stream/close`
+  - `/v1/stream/write`
+  - `/v1/stream/read`
+- Request body: JSON; response: JSON `Content-Type: application/json`.
+- Application errors: HTTP **200** + `"ok": false` per architecture doc.
+- Parse/build JSON with **cJSON** (IDF component). Base64 with
+  **mbedtls_base64_encode** / **mbedtls_base64_decode**.
+- One global mutex inside `host_api` serializes all `/v1` handlers (commands and
+  stream). Concurrent second request MAY wait on the mutex or return `busy` if
+  wait would exceed ~100 ms — prefer **return `busy`** if lock not acquired
+  within 100 ms (deterministic for agents).
+
+#### Lifecycle (decided — mirror mDNS window)
+
+Hook in `sync_device_discovery()` in `app_core_wifi.c` (same function that
+starts/stops `device_discovery`):
+
+| Condition | Action |
+| --- | --- |
+| `link_status == WIFI_LINK_STATUS_CONNECTED` | `device_discovery_start()` then `host_api_start()` |
+| Leaving CONNECTED (was connected) | `host_api_stop("link_lost")` then `device_discovery_stop("link_lost")` |
+| `WIFI_PROV_EVENT_AP_STARTED` or `PORTAL_READY` | `host_api_stop("portal")` then existing `device_discovery_stop("portal")` |
+
+Do **not** call `host_api_stop` from the factory-reset erase path before portal
+transition in a way that blocks erase; stopping on `AP_STARTED`/`PORTAL_READY`
+is sufficient (same lesson as Run 025 / mDNS).
+
+Host API MUST be down whenever SoftAP portal httpd is up.
+
+#### Constants (b00)
+
+| Symbol / value | Value |
+| --- | --- |
+| `board_id` | `"b00_basehil"` |
+| `board_number` | `"00"` |
+| Command timeout | 5000 ms (handler wall time) |
+| Echo `text` max | 128 bytes |
+| Frame max decoded | 1024 bytes |
+| Loopback RX queue depth | **16** frames |
+| Stream session string | `"1"` while open (v1 single session) |
+| `info.streams_supported` | `true` |
+
+`identity` in `info`: from `device_identity_get()` (no `.local`).
+`sta_ipv4` in `info`: current STA IPv4 string, or `""` if unavailable.
+
+#### Command handlers (required)
+
+| name | Behavior |
+| --- | --- |
+| `ping` | `{ "pong": true }` |
+| `info` | Mandatory fields per command API |
+| `capabilities` | Return embedded manifest below as `result` (object, not string) |
+| `echo` | Require `args.text` string ≤128; echo in `result.text` |
+
+Unknown `name` → `unknown_command`.
+
+#### Stream `loopback` (required on b00)
+
+1. `open` with `stream_id=="loopback"` and `params` object (may be `{}`); reject
+   other ids with `unknown_stream`; if already open → `busy`.
+2. `write`: decode Base64; if length 0..1024 enqueue copy on RX FIFO; return
+   `bytes_written`.
+3. `read`: per stream API (`max_frames` 1..16, `timeout_ms` 0..5000); FIFO out.
+4. On RX overflow (17th frame): drop **oldest**, enqueue new.
+5. `close`: clear queue; idempotent.
+
+#### Normative `capabilities` result for b00 (exact catalog)
+
+Implementer MUST return a `result` object semantically equal to this catalog
+(field order in JSON MAY vary; names/types/summaries MUST match):
+
+```json
+{
+  "api_version": 1,
+  "board_id": "b00_basehil",
+  "summary": "Family base HIL bench with host API demos (echo, loopback)",
+  "commands": [
+    {
+      "name": "ping",
+      "summary": "Liveness check",
+      "args": [],
+      "result": [{ "name": "pong", "type": "bool" }]
+    },
+    {
+      "name": "info",
+      "summary": "Identity and STA network snapshot",
+      "args": [],
+      "result": [
+        { "name": "api_version", "type": "int" },
+        { "name": "board_id", "type": "string" },
+        { "name": "board_number", "type": "string" },
+        { "name": "identity", "type": "string" },
+        { "name": "sta_ipv4", "type": "string" },
+        { "name": "streams_supported", "type": "bool" }
+      ]
+    },
+    {
+      "name": "capabilities",
+      "summary": "Return this capability manifest",
+      "args": [],
+      "result": [
+        { "name": "api_version", "type": "int" },
+        { "name": "board_id", "type": "string" },
+        { "name": "summary", "type": "string" },
+        { "name": "commands", "type": "object" },
+        { "name": "streams", "type": "object" }
+      ]
+    },
+    {
+      "name": "echo",
+      "summary": "Round-trip a short text string",
+      "args": [
+        { "name": "text", "type": "string", "required": true, "notes": "max 128 bytes" }
+      ],
+      "result": [{ "name": "text", "type": "string" }]
+    }
+  ],
+  "streams": [
+    {
+      "stream_id": "loopback",
+      "summary": "Echo written frames back on read (no DUT UART)",
+      "params": [],
+      "payload": "opaque bytes; write enqueues identical payload for read; max 1024 per frame"
+    }
+  ]
+}
+```
+
+Preferred implementation: build from static C descriptors in
+`host_api_capabilities.c`, or a single `const char` JSON parsed once — either is
+fine if the response matches.
+
+#### Acceptance criteria (firmware)
+
+1. SoftAP portal unchanged; no `/v1` on SoftAP.
+2. After STA+IPv4: `ping`, `info`, `capabilities`, `echo` succeed via
+   `http://HIL-00-<MAC4>.local/v1/command` (or STA IP).
+3. `capabilities` lists `echo` and `loopback` as above; `info.streams_supported`
+   is true.
+4. `loopback` open → write Base64 `AQID` → read returns one frame with those
+   bytes → close.
+5. `host_api_stop` on link loss / portal; `host_api_start` only when connected.
+6. No raw TCP :9000; no WebSocket.
+7. Implementer notes recorded under this ID in
+   `agent-workspaces/implementer/handoff.md`; status **implemented** only after
+   the above work lands (tester validates on hardware separately).
+
+#### Non-goals (implementer must not do)
+
+- Auth, TLS, OpenAPI UI, TCP data port, UART DUT backend on b00
+- Reading Markdown at runtime for capabilities
+- Merging SoftAP and STA httpd into one process that serves both modes at once
+
+```text
+Open questions:
+  - None — structure, API, lifecycle, and b00 manifest fixed above.
+```
+
+## EXTERNAL_HOST_API_V1_CONCEPT
+
+```text
+Role boundary check:
+  Architect documentation only for this handoff slice. Firmware is pending
+  implementer (do not mark host API as implemented in code from this session).
+ID: EXTERNAL_HOST_API_V1_CONCEPT
+Date: 2026-11-03
+Source:
+  - Human: conceive lightweight LLM-friendly mechanisms for (1) slow commands
+    with response and (2) streaming binary digital frames (e.g. serial).
+  - Human correction: primary client IS the LLM agent (not a blocking TCP tool).
+Objective:
+  Normative family host API: HTTP JSON only — commands + agent-bounded stream
+  open/close/write/read (Base64 frames).
+Authorized files (architect):
+  - docs/external_host_api_architecture.md
+  - docs/external_host_command_api.md (new)
+  - docs/external_host_stream_api.md (new)
+  - docs/hil_base_platform_scope.md
+  - docs/hil_base_reuse_contract.md
+  - docs/architecture.md
+  - docs/hil_board_particular_spec_template.md
+  - docs/board_host_api_extensions.md
+  - docs/hil_base_spec_changelog.md (BASE-CHANGE-20261103-2, -3)
+  - agent-workspaces/architect/handoff.md, decisions.md
+  - agent-workspaces/implementer/handoff.md (pending firmware tasks only)
+Normative summary:
+  - Primary client: LLM agent; active only on STA+IPv4; no auth/TLS v1
+  - POST /v1/command — sync 5 s; mandatory ping, info (later + capabilities)
+  - POST /v1/stream/open|close|write|read — one session; Base64 payload max
+    1024 decoded bytes; read with timeout_ms / max_frames
+  - Raw TCP :9000 and WebSocket are non-goals for v1 (optional later for
+    non-agent tools; must not replace HTTP write/read)
+  - Particulars extend names/stream_ids; runtime catalog via capabilities
+    (see HOST_API_CAPABILITIES_ECHO_LOOPBACK)
+Pending implementer (firmware — not done by architect):
+  - See HOST_API_CAPABILITIES_ECHO_LOOPBACK pending list (supersedes stubs-only)
+Acceptance (docs):
+  - Three host API docs exist and cross-link; agent-primary + no TCP data plane
+  - Family pointers + changelog + particular template updated
+  - Implementer tasks listed as pending, not implemented
+Open questions:
+  - None for v1 concept (auth/async jobs / optional WS-TCP high-throughput
+    deferred).
+```
+
+## OLED_CONNECTED_MDNS_HOSTNAME_LINE
+
+```text
+Role boundary check:
+  Architect normative docs. Firmware change belongs to implementer.
+ID: OLED_CONNECTED_MDNS_HOSTNAME_LINE
+Date: 2026-11-03
+Source:
+  - Human: add mDNS announce hostname on connected OLED between WIFI OK and IP.
+  - Extends/supersedes OLED_CONNECTED_IP_WIDTH_FIT (IP truncation + font budget).
+Objective:
+  Connected WiFi OLED shows five lines: WIFI OK, mDNS/SoftAP identity hostname,
+  full STA IPv4, STA MAC split across two lines — all readable (MEDIUM font).
+Screen layout (normative):
+  Line 0: WIFI OK
+  Line 1: device_identity_get() string, e.g. HIL-00-24CE
+          - Same string as SoftAP SSID / mDNS hostname
+          - MUST NOT append .local on OLED
+  Line 2: sta_ipv4 (full, up to 15 chars)
+  Line 3: sta_mac[0..7]  (XX:XX:XX)
+  Line 4: sta_mac[9..16] (XX:XX:XX)
+Display template:
+  - Add DISPLAY_TEMPLATE_FULL_FIVE_LINES
+  - display_layout_template_full_five_lines(layout, lines, count)
+  - font_policy DISPLAY_FONT_MEDIUM (not AUTO_FIT)
+  - Bands: y=0/12/24/36 height 12; y=48 height 16
+  - Wire show_template switch in display_controller.c
+app_core_wifi:
+  - show_wifi_connected_display(): build 5 lines as above
+  - Call app_core_display_show_template(DISPLAY_TEMPLATE_FULL_FIVE_LINES, ...)
+  - Obtain hostname via device_identity_get() into a local buffer
+  - app_core CMake MUST REQUIRE device_identity if not already transitive
+  - Fallback if identity or IP/MAC missing: keep existing FULL_TWO_LINES WIFI/OK
+String budget (unchanged):
+  - MEDIUM = 16 chars max on 128 px; IPv4 15 and HIL-00-XXXX 11 fit
+Authorized files (implementer):
+  - components/display/include/display_types.h
+  - components/display/include/display_layout_templates.h
+  - components/display/display_layout_templates.c
+  - components/display/display_controller.c
+  - components/app_core/app_core_wifi.c
+  - components/app_core/CMakeLists.txt (device_identity if needed)
+  - agent-workspaces/implementer/handoff.md
+Normative docs (architect done):
+  - docs/oled_text_display_interface.md
+  - docs/device_discovery_mdns_architecture.md
+  - docs/architecture.md / docs/test_strategy.md as needed
+Acceptance criteria:
+  1. Build succeeds.
+  2. On STA connected: OLED shows five lines in the order above.
+  3. Line 1 matches SoftAP SSID / serial mdns hostname (no .local).
+  4. Line 2 shows complete STA IPv4 (no truncation of last octets).
+  5. Lines 3–4 still show split STA MAC as today.
+  6. Operator can visually confirm hostname matches what resolves as .local.
+Non-goals:
+  - Showing .local on OLED
+  - QR on connected screen, scrolling, ellipsis, IPv6
+  - Width-aware AUTO_FIT engine (backlog)
+  - Changing provisioning QR setup layouts
+Open questions:
+  - None.
+```
+
+## OLED_CONNECTED_IP_WIDTH_FIT
+
+```text
+Role boundary check:
+  Architect normative docs. Firmware change belongs to implementer.
+ID: OLED_CONNECTED_IP_WIDTH_FIT
+Date: 2026-11-03
+Status: SUPERSEDED by OLED_CONNECTED_MDNS_HOSTNAME_LINE (same implementer
+  delivery: MEDIUM font + connected screen layout).
+Summary: Documented glyph budgets; four-line MEDIUM-only path replaced by
+  five-line FULL_FIVE_LINES connected screen that also fixes IP truncation.
+Open questions:
+  - None.
+```
+
+## WIFI_FACTORY_RESET_MDNS_SAFE
+
+```text
+Role boundary check:
+  Architect clarified normative docs. Firmware fix belongs to implementer.
+ID: WIFI_FACTORY_RESET_MDNS_SAFE
+Date: 2026-11-03
+Source:
+  - agent-workspaces/tester/handoff.md TESTER_RETURN_FACTORY_RESET_MDNS_HANG
+  - Run 025 / feedback Entry 029
+Objective:
+  Make GPIO7 runtime factory reset succeed when STA is connected and mDNS is
+  announcing: erase NVS and open SoftAP portal without hanging in
+  device_discovery_stop / mdns_unregister_netif.
+Reason:
+  Normative factory-reset sequence was erase → portal, clear for portal/connect-
+  cycle (Run 021). As-built later inserted blocking device_discovery_stop before
+  erase; STA+mDNS hang left credentials intact. Architecture did not forbid that
+  ordering until this clarification.
+Authorized files (implementer):
+  - components/app_core/app_core_wifi.c (factory_reset_runtime_sequence order)
+  - components/device_discovery/device_discovery.c (bounded/non-hanging stop if needed)
+  - docs/wifi_factory_reset_implementation_reference.md (update as-built after fix)
+  - agent-workspaces/implementer/handoff.md
+Normative docs (architect done):
+  - docs/wifi_factory_reset_architecture.md
+  - docs/device_discovery_mdns_architecture.md
+  - docs/test_strategy.md
+Expected implementer behavior:
+  1. MUST NOT block erase/portal behind discovery_stop while STA+mDNS active.
+  2. Prefer erase → factory_reset_to_portal; let AP_STARTED stop discovery with
+     reason portal; or stop discovery only after STA down, non-blocking.
+  3. discovery_stop MUST return in bounded time; erase proceeds even if stop skips.
+Acceptance criteria:
+  - STA + mDNS active → GPIO7 ≥ 10 s → serial shows erase + portal_active; no hang.
+  - Reboot does not reconnect with old NVS credentials.
+  - SoftAP portal + OLED setup UX.
+  - Run 021 portal/connect-cycle reset still PASS (regression).
+Non-goals:
+  - Changing 10 s hold duration or GPIO polarity.
+  - Web-based credential erase.
+Open questions:
+  - None.
+```
+
+## HIL_BASE_REUSE_CONTRACT — I2C extra devices on daughter boards
+
+```text
+Role boundary check:
+  Architect documentation only. No driver or board_pins.h edits.
+ID: HIL_BASE_REUSE_CONTRACT (extension)
+Date: 2026-11-03
+Source:
+  - Human: clarify that INA/other I2C product devices belong on daughter boards;
+    base test bench has none; do not damage shared I2C architecture.
+Objective:
+  Make ownership explicit: i2c_bus = base; extra slaves = particular optional
+  components documented per board.
+Acceptance criteria:
+  - connections + i2c_bus docs no longer require INA on b00_basehil bench.
+  - platform scope states I2C ownership split.
+  - BASE-CHANGE-20261103-1 recorded.
+  - No firmware/driver changes.
 Open questions:
   - None.
 ```

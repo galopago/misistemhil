@@ -98,19 +98,23 @@ or other host) communicates with **each** HIL board after the board is on the
 user network: transport, API surface, protocol, message contracts, versioning,
 and error model.
 
-**Authoritative base doc:**
+**Authoritative base docs:**
 
-- `docs/external_host_api_architecture.md`
+- `docs/external_host_api_architecture.md` — overview, discovery, ask-the-board
+- `docs/external_host_command_api.md` — slow HTTP JSON commands including
+  mandatory `capabilities`
+- `docs/external_host_stream_api.md` — agent-bounded binary frames (HTTP
+  open/close/write/read + Base64); reference demo `loopback` on b00_basehil
 
-That document is the **only** normative home for family-wide host↔board
-communication methodology. Board repos may expose **additional** product
-endpoints or payloads **only** as particular extensions documented in their own
-files, and those extensions MUST NOT contradict or fork the base host API
-contract.
+These are the **only** normative homes for family-wide host↔board communication
+methodology. Agents discover board-specific commands/streams via on-device
+`capabilities`. Board repos may document extras in `board_host_api_extensions.md`
+as an implementer checklist; they MUST NOT contradict or fork the base transport
+and MUST keep the firmware manifest in sync.
 
-**Status note:** detailed request/response schemas may still be evolving; until
-filled in, `docs/external_host_api_architecture.md` remains the reserved base
-file. Particulars MUST NOT create a competing family-wide host protocol doc.
+**Status note:** v1 concept is normative; firmware implementation is pending
+(`EXTERNAL_HOST_API_V1_CONCEPT`, `HOST_API_CAPABILITIES_ECHO_LOOPBACK`).
+Particulars MUST NOT create a competing family-wide host protocol doc.
 
 ## Support Contracts Still Base-Owned
 
@@ -122,9 +126,16 @@ surface because onboarding, discovery, and host API depend on them:
 | Reuse / family rules | `docs/hil_base_reuse_contract.md`, this file |
 | Engineering overview | `docs/architecture.md` |
 | Display delivery / OLED / QR | `docs/display_delivery_contract.md`, `docs/oled_text_display_interface.md`, `docs/qr_encoder_interface.md` |
-| I2C bus | `docs/i2c_bus_architecture.md` |
+| I2C bus (shared master, device-agnostic) | `docs/i2c_bus_architecture.md` |
 | Methodology / roles | `docs/methodology.md`, `AGENTS.md`, `docs/architect_role_hard_stop.md` |
 | Test strategy (base) | `docs/test_strategy.md` |
+
+**I2C ownership split:** the **bus layer and concurrency rules** are base-owned.
+**Extra I2C product devices** (INA219 current monitors, other sensors,
+board-unique slaves) are **particular** to each `bNN_hil` board: list them in
+that board's `board_hardware_description.md` and implement them as optional
+components. The `b00_basehil` minimum test profile uses OLED on I2C only and
+MUST NOT require those extra devices.
 
 ## Particular Surface (Owned by Each `bNN_hil` Repo)
 
@@ -138,6 +149,7 @@ board and must be revisable independently:
 | --- | --- |
 | **Functional description** (what the board does: RS-485, relays, logic analyzer, …) | `docs/board_functional_description.md` |
 | **Hardware description** (MCU/module, peripherals, pin→function map; may differ from base) | `docs/board_hardware_description.md` |
+| Extra I2C product devices (INA219, other slaves) and their addresses | Same hardware description + optional device components |
 | Board number constant (`NN`) | Board-owned config |
 | Schematics / PCB | Board `pcb/` (authoritative for pins) |
 | Deeper product HIL channels, sensors, actuators, UX | `docs/board_product_architecture.md` (as needed) |

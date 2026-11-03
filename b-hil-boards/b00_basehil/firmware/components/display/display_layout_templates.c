@@ -54,8 +54,30 @@ void display_layout_template_full_four_lines(display_layout_t *layout, const cha
     region->rect = (display_rect_t){.x = 0, .y = 0, .width = 128, .height = 64};
     region->content.type = DISPLAY_CONTENT_TEXT;
 
-    init_text_region(&region->content.text, 4, DISPLAY_FONT_AUTO_FIT);
+    /* MEDIUM: ≤16 chars/line so STA IPv4 (≤15) is not truncated (AUTO_FIT→LARGE
+     * on 16 px bands only fits 10 chars). Handoff OLED_CONNECTED_IP_WIDTH_FIT. */
+    init_text_region(&region->content.text, 4, DISPLAY_FONT_MEDIUM);
     fill_text_lines(&region->content.text, lines, line_count, 4);
+}
+
+void display_layout_template_full_five_lines(display_layout_t *layout, const char *const *lines,
+                                             size_t line_count)
+{
+    if (layout == NULL) {
+        return;
+    }
+
+    memset(layout, 0, sizeof(*layout));
+    layout->region_count = 1;
+
+    display_region_t *region = &layout->regions[0];
+    strncpy(region->id, "main", sizeof(region->id) - 1);
+    region->rect = (display_rect_t){.x = 0, .y = 0, .width = 128, .height = 64};
+    region->content.type = DISPLAY_CONTENT_TEXT;
+
+    /* Five 12 px bands (64/5); MEDIUM visual_height 12. OLED_CONNECTED_MDNS_HOSTNAME_LINE. */
+    init_text_region(&region->content.text, 5, DISPLAY_FONT_MEDIUM);
+    fill_text_lines(&region->content.text, lines, line_count, 5);
 }
 
 void display_layout_template_full_two_lines(display_layout_t *layout, const char *const *lines,

@@ -35,3 +35,74 @@ Actions taken in this repo:
 Open questions:
   - None
 ```
+
+## Sync entry
+
+```text
+Consumed IDs: BASE-CHANGE-20261103-1
+Date consumed: 2026-11-03
+Agent role: architect
+Actions taken in this repo:
+  - Clarified I2C ownership: shared bus is base; extra slaves (INA219, etc.)
+    are daughter-board particular. Updated connections, i2c_bus architecture,
+    platform scope, architecture, reuse contract, particular template.
+  - No driver or board_pins.h changes.
+Open questions:
+  - None
+```
+
+## Sync entry
+
+```text
+Consumed IDs: BASE-CHANGE-20261103-2
+Date consumed: 2026-11-03
+Agent role: architect
+Actions taken in this repo:
+  - Published external host API v1 concept (overview + command + stream docs).
+  - Updated board_host_api_extensions.md and family pointers.
+  - Firmware for host API left pending for implementer.
+Open questions:
+  - None
+```
+
+## Sync entry
+
+```text
+Consumed IDs: BASE-CHANGE-20261103-3
+Date consumed: 2026-11-03
+Agent role: architect
+Actions taken in this repo:
+  - Revised host stream plane to agent-primary HTTP write/read (dropped TCP 9000).
+  - Updated family pointers, extensions compatibility line, particular scope.
+  - Firmware still pending EXTERNAL_HOST_API_V1_CONCEPT.
+Open questions:
+  - None
+```
+
+## Sync entry
+
+```text
+Consumed IDs: BASE-CHANGE-20261103-4
+Date consumed: 2026-11-03
+Agent role: architect
+Actions taken in this repo:
+  - Documented mandatory capabilities (ask-the-board) and b00 demos echo/loopback.
+  - Updated board_host_api_extensions.md checklist to match planned manifest.
+  - Firmware still pending HOST_API_CAPABILITIES_ECHO_LOOPBACK.
+Open questions:
+  - None
+```
+
+## Sync entry
+
+```text
+Consumed IDs: BASE-CHANGE-20261103-5
+Date consumed: 2026-11-03
+Agent role: architect
+Actions taken in this repo:
+  - Documented port-80 exclusivity and PORTAL_TEARDOWN_COMPLETE → host_api_start.
+  - Closed TESTER_RETURN_HOST_API_AFTER_PROVISION as HOST_API_AFTER_PORTAL_TEARDOWN.
+  - Firmware pending implementer.
+Open questions:
+  - None
+```

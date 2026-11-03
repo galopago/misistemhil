@@ -83,11 +83,10 @@ esp_err_t device_discovery_stop(const char *reason)
         return ESP_OK;
     }
 
-    esp_netif_t *sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (sta_netif != NULL) {
-        (void)mdns_unregister_netif(sta_netif);
-    }
-
+    /* Clear local announce state first. Do not call mdns_unregister_netif here:
+     * while STA is still up it can hang indefinitely (Run 025 factory reset).
+     * Announcement ends when WiFi stops or SoftAP portal starts; start() tolerates
+     * ESP_ERR_INVALID_STATE if the netif is still registered. */
     s_active = false;
     s_active_hostname[0] = '\0';
     ESP_LOGI(TAG, "mdns stop reason=%s", reason != NULL ? reason : "unknown");

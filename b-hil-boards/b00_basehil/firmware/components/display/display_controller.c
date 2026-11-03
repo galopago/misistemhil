@@ -34,6 +34,9 @@ esp_err_t display_controller_show_template(display_layout_template_t template_id
     case DISPLAY_TEMPLATE_FULL_FOUR_LINES:
         display_layout_template_full_four_lines(&s_controller_layout, lines, line_count);
         break;
+    case DISPLAY_TEMPLATE_FULL_FIVE_LINES:
+        display_layout_template_full_five_lines(&s_controller_layout, lines, line_count);
+        break;
     case DISPLAY_TEMPLATE_FULL_TWO_LINES:
         display_layout_template_full_two_lines(&s_controller_layout, lines, line_count);
         break;

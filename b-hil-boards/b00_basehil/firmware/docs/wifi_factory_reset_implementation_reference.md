@@ -131,6 +131,12 @@ The **double sample** after delay avoids counting a glitch press.
 4. Log: factory reset complete portal_active=true
 ```
 
+**mDNS (WIFI_FACTORY_RESET_MDNS_SAFE / Run 025):** Do **not** call
+`device_discovery_stop("factory_reset")` before steps 2–3. SoftAP start emits
+`AP_STARTED` / `PORTAL_READY`; `sync_device_discovery` stops announcement with
+`reason=portal`. `device_discovery_stop()` clears local state only (no
+`mdns_unregister_netif`) so it returns in bounded time.
+
 ## `wifi_provisioning_factory_reset_to_portal()` (exact order)
 
 ```c

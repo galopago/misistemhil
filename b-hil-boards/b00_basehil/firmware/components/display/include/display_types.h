@@ -75,6 +75,7 @@ typedef enum {
     DISPLAY_TEMPLATE_FULL_TWO_LINES = 1,
     DISPLAY_TEMPLATE_TOP_TWO_BOTTOM_ONE = 2,
     DISPLAY_TEMPLATE_QR_LEFT_TEXT_RIGHT = 3,
+    DISPLAY_TEMPLATE_FULL_FIVE_LINES = 4,
 } display_layout_template_t;
 
 typedef enum {

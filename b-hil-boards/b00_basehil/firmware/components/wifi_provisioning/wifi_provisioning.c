@@ -700,6 +700,9 @@ static void success_teardown_task(void *arg)
     ESP_LOGI(TAG, "SoftAP stopped after provisioning success");
     ESP_LOGI(TAG, "STA-only mode active after provisioning success");
     s_portal_active = false;
+    /* Port 80 free: app_core may start host_api (HOST_API_AFTER_PORTAL_TEARDOWN). */
+    ESP_LOGI(TAG, "portal teardown complete");
+    emit_event(WIFI_PROV_EVENT_PORTAL_TEARDOWN_COMPLETE, NULL, NULL, NULL, NULL, ESP_OK);
     vTaskDelete(NULL);
 }
 
