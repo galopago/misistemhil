@@ -30,8 +30,12 @@ HIL switching of DUT signals or loads:
   all relay controls are outputs driven low.
 - A **ULN2003** sinks the relay coils; contacts are brought out on connector
   `J2` for external wiring.
-- On-board OLED and error LED provide the shared base provisioning/status UX;
-  channel LEDs (`D1`…`D6`) show drive assertion per relay.
+- On-board OLED: base provisioning/failure UX; while STA connected, main screen
+  shows mDNS hostname plus per-channel view tokens `N:[0|1|P|T|E]` (see
+  `docs/board_main_relay_oled_architecture.md`). Error LED follows base WiFi
+  link rules. Channel LEDs (`D1`…`D6`) show electrical drive assertion per
+  relay (including fast edges that the OLED must not flicker).
+
 - Optional remote connector `J1` mirrors I2C, factory-reset, error LED, and
   per-channel LED sense lines.
 
@@ -42,6 +46,10 @@ HIL switching of DUT signals or loads:
 - Host API extensions to read/set relay states (`relay_set`,
   `relay_set_all`, `relay_get`, `relay_get_all` — see
   `docs/board_host_api_relay_architecture.md`)
+- LLM-oriented timed actions and encoder simulation (architecture v2 pending
+  firmware — `docs/board_host_api_relay_v2_architecture.md`): non-blocking
+  pulse/hold (incl. long holds), multi-channel arming, quadrature on **two**
+  relays (direction + speed), single-channel pulse train
 - Shared family onboarding, discovery, and base host commands
 
 ## Out of scope for this board
@@ -50,6 +58,7 @@ HIL switching of DUT signals or loads:
 - Redefining family WiFi onboarding, mDNS discovery, or base host transport
 - Assuming `b00_basehil` GPIO numbers without the map in
   `docs/board_hardware_description.md`
+- Blocking the MCU for the duration of pulses/holds/encoder runs
 
 ## Relationship to base pillars
 

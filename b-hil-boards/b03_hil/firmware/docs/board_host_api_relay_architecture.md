@@ -29,7 +29,7 @@ module boundaries so an LLM agent and the implementer share one contract.
 
 ## Scope
 
-### In scope
+### In scope (v1 — shipped)
 
 - Four particular commands: `relay_set`, `relay_set_all`, `relay_get`,
   `relay_get_all`.
@@ -37,13 +37,20 @@ module boundaries so an LLM agent and the implementer share one contract.
 - `capabilities` catalog entries and `info` fields for this board.
 - Wiring handlers to `app_core_relay_*` / `relay_ctrl_*`.
 
+### v2 timed / encoder actions (architecture ready — firmware pending)
+
+Normative contract: **`docs/board_host_api_relay_v2_architecture.md`**
+(`B03_HOST_API_RELAY_V2_LLM`): non-blocking pulse/hold/hold_many, preempt,
+quadrature `encoder_step` (2 channels), `encoder_pulse_train` (1 channel),
+relay timing limits.
+
 ### Out of scope
 
 - Binary streams for relays.
 - SoftAP-portal relay control (host API only when STA + IPv4).
 - Changing `/v1` paths or mandatory `ping` / `info` / `capabilities`.
 - `echo` / `loopback` on this board.
-- Timed pulses, schedules, or interlocks.
+- Blocking waits for pulse/hold/encoder duration (forbidden in v2).
 
 ## Transport (unchanged family rules)
 

@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "i2c_bus.h"
 #include "relay_ctrl.h"
+#include "relay_sched.h"
 #include "setup_url.h"
 
 static const char *TAG = "app_core";
@@ -56,6 +57,8 @@ void app_core_start(void)
 
     /* OE-safe relay bring-up before any long init (I2C / display / WiFi). */
     ESP_ERROR_CHECK(relay_ctrl_init());
+    app_core_relay_oled_register();
+    ESP_ERROR_CHECK(relay_sched_init());
 
     const b03_hil_board_pins_t *pins = board_pins();
     ESP_LOGI(TAG, "I2C SCL GPIO%d SDA GPIO%d", pins->i2c_scl, pins->i2c_sda);
@@ -104,11 +107,13 @@ esp_err_t app_core_display_show_qr_setup(const char *url, const char *const *tex
 
 esp_err_t app_core_relay_set(int channel, bool on)
 {
+    (void)relay_sched_preempt_channel(channel);
     return relay_ctrl_set(channel, on);
 }
 
 esp_err_t app_core_relay_set_mask(uint8_t mask)
 {
+    (void)relay_sched_preempt_all();
     return relay_ctrl_set_mask(mask);
 }
 
@@ -120,4 +125,20 @@ esp_err_t app_core_relay_get(int channel, bool *on_out)
 uint8_t app_core_relay_get_mask(void)
 {
     return relay_ctrl_get_mask();
+}
+
+esp_err_t app_core_relay_pulse(int channel, uint32_t duration_ms)
+{
+    return relay_sched_pulse(channel, duration_ms);
+}
+
+esp_err_t app_core_relay_hold(int channel, uint32_t duration_ms)
+{
+    return relay_sched_hold(channel, duration_ms);
+}
+
+esp_err_t app_core_relay_release_all(void)
+{
+    (void)relay_sched_cancel_all();
+    return relay_ctrl_set_mask(0);
 }

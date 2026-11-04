@@ -44,7 +44,9 @@ Hardware authority: `docs/board_hardware_description.md` (PCB pinfunction).
 ### Out of scope
 
 - Host JSON schemas (sibling doc)
-- OLED layouts
+- OLED line layout / token grammar (see
+  `docs/board_main_relay_oled_architecture.md`) — this file may still own
+  optional `relay_view_mode_t` state used by that screen
 - Driving `KnDRV` GPIOs directly (those nets are **not** MCU pins)
 - Pulse / interlock / mutual-exclusion matrices between channels
 - Reading back coil or contact sense (no sense HW on MCU)

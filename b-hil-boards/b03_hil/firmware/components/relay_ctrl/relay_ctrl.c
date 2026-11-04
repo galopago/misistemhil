@@ -13,6 +13,8 @@ static SemaphoreHandle_t s_mutex = NULL;
 static bool s_initialized = false;
 static bool s_oe_enabled = false;
 static uint8_t s_shadow_mask = 0;
+static relay_view_mode_t s_view_mode[BOARD_RELAY_CHANNEL_COUNT];
+static relay_ctrl_view_changed_cb_t s_view_changed_cb = NULL;
 
 static const gpio_num_t s_ctr_gpios[BOARD_RELAY_CHANNEL_COUNT] = {
     BOARD_RELAY1_CTR_GPIO, BOARD_RELAY2_CTR_GPIO, BOARD_RELAY3_CTR_GPIO,
@@ -42,6 +44,58 @@ static void apply_ctr_levels_unlocked(uint8_t mask)
         gpio_set_level(s_ctr_gpios[i], level);
     }
     s_shadow_mask = (uint8_t)(mask & RELAY_CTRL_MASK_ALL);
+}
+
+static bool apply_static_view_channel_unlocked(int idx, bool on)
+{
+    const relay_view_mode_t next = on ? RELAY_VIEW_STATIC_ON : RELAY_VIEW_STATIC_OFF;
+    if (s_view_mode[idx] == next) {
+        return false;
+    }
+    s_view_mode[idx] = next;
+    return true;
+}
+
+static bool apply_static_view_from_mask_unlocked(uint8_t mask)
+{
+    bool changed = false;
+    for (int i = 0; i < BOARD_RELAY_CHANNEL_COUNT; ++i) {
+        const bool on = ((mask >> i) & 0x1U) != 0U;
+        if (apply_static_view_channel_unlocked(i, on)) {
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+static void notify_view_changed(bool changed)
+{
+    if (changed && s_view_changed_cb != NULL) {
+        s_view_changed_cb();
+    }
+}
+
+char relay_ctrl_view_token(relay_view_mode_t mode)
+{
+    switch (mode) {
+    case RELAY_VIEW_STATIC_OFF:
+        return '0';
+    case RELAY_VIEW_STATIC_ON:
+        return '1';
+    case RELAY_VIEW_PULSE:
+        return 'P';
+    case RELAY_VIEW_TRAIN:
+        return 'T';
+    case RELAY_VIEW_ENCODER:
+        return 'E';
+    default:
+        return '0';
+    }
+}
+
+void relay_ctrl_set_view_changed_callback(relay_ctrl_view_changed_cb_t cb)
+{
+    s_view_changed_cb = cb;
 }
 
 esp_err_t relay_ctrl_init(void)
@@ -106,10 +160,11 @@ esp_err_t relay_ctrl_init(void)
         return err;
     }
 
-    /* Step 4: clear shadow; re-assert CTR lows. */
+    /* Step 4: clear shadow; re-assert CTR lows; all view modes static off. */
     s_shadow_mask = 0;
     for (int i = 0; i < BOARD_RELAY_CHANNEL_COUNT; ++i) {
         gpio_set_level(s_ctr_gpios[i], ctr_inactive);
+        s_view_mode[i] = RELAY_VIEW_STATIC_OFF;
     }
 
     /* Step 5: enable OE (active low) only with all CTR cold. */
@@ -124,7 +179,7 @@ esp_err_t relay_ctrl_init(void)
     return ESP_OK;
 }
 
-esp_err_t relay_ctrl_set(int channel, bool on)
+static esp_err_t set_or_drive(int channel, bool on, bool update_view)
 {
     if (!channel_valid(channel)) {
         return ESP_ERR_INVALID_ARG;
@@ -150,12 +205,17 @@ esp_err_t relay_ctrl_set(int channel, bool on)
     }
     apply_ctr_levels_unlocked(mask);
 
+    bool view_changed = false;
+    if (update_view) {
+        view_changed = apply_static_view_channel_unlocked(idx, on);
+    }
+
     xSemaphoreGive(s_mutex);
-    ESP_LOGD(TAG, "set channel=%d on=%d", channel, on ? 1 : 0);
+    notify_view_changed(view_changed);
     return ESP_OK;
 }
 
-esp_err_t relay_ctrl_set_mask(uint8_t mask)
+static esp_err_t set_or_drive_mask(uint8_t mask, bool update_view)
 {
     if ((mask & (uint8_t)~RELAY_CTRL_MASK_ALL) != 0U) {
         return ESP_ERR_INVALID_ARG;
@@ -172,9 +232,43 @@ esp_err_t relay_ctrl_set_mask(uint8_t mask)
     }
 
     apply_ctr_levels_unlocked(mask);
+
+    bool view_changed = false;
+    if (update_view) {
+        view_changed = apply_static_view_from_mask_unlocked(mask);
+    }
+
     xSemaphoreGive(s_mutex);
-    ESP_LOGD(TAG, "set_mask=0x%02X", mask);
+    notify_view_changed(view_changed);
     return ESP_OK;
+}
+
+esp_err_t relay_ctrl_set(int channel, bool on)
+{
+    const esp_err_t err = set_or_drive(channel, on, true);
+    if (err == ESP_OK) {
+        ESP_LOGD(TAG, "set channel=%d on=%d", channel, on ? 1 : 0);
+    }
+    return err;
+}
+
+esp_err_t relay_ctrl_set_mask(uint8_t mask)
+{
+    const esp_err_t err = set_or_drive_mask(mask, true);
+    if (err == ESP_OK) {
+        ESP_LOGD(TAG, "set_mask=0x%02X", mask);
+    }
+    return err;
+}
+
+esp_err_t relay_ctrl_drive(int channel, bool on)
+{
+    return set_or_drive(channel, on, false);
+}
+
+esp_err_t relay_ctrl_drive_mask(uint8_t mask)
+{
+    return set_or_drive_mask(mask, false);
 }
 
 esp_err_t relay_ctrl_get(int channel, bool *on_out)
@@ -195,6 +289,56 @@ esp_err_t relay_ctrl_get(int channel, bool *on_out)
 
     *on_out = ((s_shadow_mask >> (channel - 1)) & 0x1U) != 0U;
     xSemaphoreGive(s_mutex);
+    return ESP_OK;
+}
+
+esp_err_t relay_ctrl_get_view_mode(int channel, relay_view_mode_t *mode_out)
+{
+    if (!channel_valid(channel) || mode_out == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (s_mutex == NULL || !s_initialized) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (xSemaphoreTake(s_mutex, portMAX_DELAY) != pdTRUE) {
+        return ESP_FAIL;
+    }
+    if (!s_initialized) {
+        xSemaphoreGive(s_mutex);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *mode_out = s_view_mode[channel - 1];
+    xSemaphoreGive(s_mutex);
+    return ESP_OK;
+}
+
+esp_err_t relay_ctrl_set_view_mode(int channel, relay_view_mode_t mode)
+{
+    if (!channel_valid(channel)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (mode < RELAY_VIEW_STATIC_OFF || mode > RELAY_VIEW_ENCODER) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (s_mutex == NULL || !s_initialized) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (xSemaphoreTake(s_mutex, portMAX_DELAY) != pdTRUE) {
+        return ESP_FAIL;
+    }
+    if (!s_initialized) {
+        xSemaphoreGive(s_mutex);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const int i = channel - 1;
+    const bool changed = (s_view_mode[i] != mode);
+    if (changed) {
+        s_view_mode[i] = mode;
+    }
+    xSemaphoreGive(s_mutex);
+    notify_view_changed(changed);
     return ESP_OK;
 }
 

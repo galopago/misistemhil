@@ -87,3 +87,38 @@ Actions taken in this repo:
 Open questions:
   - Retest after implementer patch; UART remux only if chatter remains
 ```
+
+## Sync entry
+
+```text
+Consumed IDs: (particular OLED architecture; no new BASE-CHANGE)
+Date consumed: 2026-11-03
+Agent role: architect (docs)
+Actions taken in this repo:
+  - Added docs/board_main_relay_oled_architecture.md (B03_MAIN_RELAY_OLED)
+  - Froze aesthetic N:[X] with square brackets; 2 channels/line; tokens
+    0/1/P/T/E (mode-stable, no pulse flicker)
+  - Updated particular_scope, product architecture, functional description,
+    implementer/architect handoffs
+  - code adapted from base (if any): none (architect hard stop)
+Open questions:
+  - OLED I2C address; pulse/train/encoder driver handoffs later
+```
+
+## Sync entry
+
+```text
+Consumed IDs: (tester OLED dynamic token gap → architecture)
+Date consumed: 2026-11-03
+Agent role: architect (docs)
+Actions taken in this repo:
+  - Added docs/board_relay_oled_view_mode_architecture.md
+    (B03_RELAY_OLED_VIEW_MODE)
+  - Superseded "P/T/E reserved only" in board_main_relay_oled_architecture.md
+  - Binding: pulse/hold→P, train→T, encoder_step→E; drive view-inert;
+    set_view_mode + callback for OLED refresh
+  - Reopened implementer handoff for relay_ctrl + relay_sched wiring
+  - code: none (architect hard stop)
+Open questions:
+  - none for token mapping; optional host JSON mode field later
+```

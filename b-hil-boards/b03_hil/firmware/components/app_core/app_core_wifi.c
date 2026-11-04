@@ -3,7 +3,6 @@
 #include "app_core.h"
 #include "board_pins.h"
 #include "device_discovery.h"
-#include "device_identity.h"
 #include "display_types.h"
 #include "host_api.h"
 #include "wifi_credentials.h"
@@ -28,9 +27,6 @@ static const char *TAG = "app_core_wifi";
 #define PROV_SETUP_LINE_SCAN_QR "2 SCAN QR"
 #define PROV_SETUP_SSID_PREFIX_LEN 7
 #define PROV_SETUP_FALLBACK_URL "http://192.168.4.1"
-#define WIFI_OK_LINE_STATUS "WIFI OK"
-#define WIFI_OK_MAC_PREFIX_LEN 8
-#define WIFI_OK_MAC_SUFFIX_OFFSET 9
 #define PROV_FAILURE_FLASH_MS 3000U
 #define PROV_SETUP_URL_MAX_LEN 32U
 #define PROV_AP_SSID_MAX_LEN 33U
@@ -67,26 +63,15 @@ static void apply_wifi_link_status_led(wifi_link_status_t status)
 
 static void show_wifi_connected_display(const wifi_prov_event_info_t *info)
 {
-    char hostname[DEVICE_ID_MAX_LEN] = {0};
-    const esp_err_t id_err = device_identity_get(hostname, sizeof(hostname));
+    (void)info;
+    /* B03_MAIN_RELAY_OLED: replace base WIFI OK five-line screen. */
+    app_core_relay_oled_set_active(true);
+    app_core_relay_oled_show();
+}
 
-    if (info == NULL || info->sta_ipv4 == NULL || info->sta_mac == NULL ||
-        strlen(info->sta_mac) != 17U || id_err != ESP_OK) {
-        const char *fallback[] = {"WIFI", "OK"};
-        (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, fallback, 2);
-        return;
-    }
-
-    char mac_line3[9];
-    char mac_line4[9];
-    strncpy(mac_line3, info->sta_mac, WIFI_OK_MAC_PREFIX_LEN);
-    mac_line3[WIFI_OK_MAC_PREFIX_LEN] = '\0';
-    strncpy(mac_line4, info->sta_mac + WIFI_OK_MAC_SUFFIX_OFFSET, 8);
-    mac_line4[8] = '\0';
-
-    /* WIFI OK / HIL-00-XXXX (no .local) / IPv4 / MAC split — FULL_FIVE_LINES. */
-    const char *lines[] = {WIFI_OK_LINE_STATUS, hostname, info->sta_ipv4, mac_line3, mac_line4};
-    (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_FIVE_LINES, lines, 5);
+static void leave_relay_oled_for_base_ux(void)
+{
+    app_core_relay_oled_set_active(false);
 }
 
 static void show_provisioning_setup_display(const wifi_prov_event_info_t *info)
@@ -134,6 +119,7 @@ static void cache_portal_display_context(const wifi_prov_event_info_t *info)
 
 static void restore_provisioning_setup_from_cache(void)
 {
+    leave_relay_oled_for_base_ux();
     if (!s_portal_display_cached || s_cached_setup_url[0] == '\0' ||
         strlen(s_cached_ap_ssid) < 8U) {
         const char *fallback[] = {"WIFI", "SETUP"};
@@ -370,10 +356,12 @@ static void on_wifi_prov_event(const wifi_prov_event_info_t *info, void *ctx)
     switch (info->event) {
     case WIFI_PROV_EVENT_AP_STARTED:
     case WIFI_PROV_EVENT_PORTAL_READY:
+        leave_relay_oled_for_base_ux();
         cache_portal_display_context(info);
         show_provisioning_setup_display(info);
         break;
     case WIFI_PROV_EVENT_SUBMITTED_CONNECTING:
+        leave_relay_oled_for_base_ux();
         cancel_provisioning_setup_restore();
         {
             const char *lines[] = {"WIFI", "CONNECTING"};
@@ -385,6 +373,7 @@ static void on_wifi_prov_event(const wifi_prov_event_info_t *info, void *ctx)
         show_wifi_connected_display(info);
         break;
     case WIFI_PROV_EVENT_SUBMITTED_FAILURE: {
+        leave_relay_oled_for_base_ux();
         const char *lines[] = {"WIFI", "FAILED"};
         (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, lines, 2);
         schedule_provisioning_setup_restore();
@@ -394,6 +383,7 @@ static void on_wifi_prov_event(const wifi_prov_event_info_t *info, void *ctx)
     case WIFI_PROV_EVENT_RUNTIME_RECONNECTING:
     case WIFI_PROV_EVENT_CONNECT_CYCLE_ACTIVE:
     case WIFI_PROV_EVENT_CONNECT_ALERT_PHASE: {
+        leave_relay_oled_for_base_ux();
         const char *lines[] = {"WIFI", "CONNECTING"};
         (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, lines, 2);
         break;
@@ -406,6 +396,7 @@ static void on_wifi_prov_event(const wifi_prov_event_info_t *info, void *ctx)
     case WIFI_PROV_EVENT_SAVED_FAILURE_LOCKED:
         break;
     case WIFI_PROV_EVENT_ERROR: {
+        leave_relay_oled_for_base_ux();
         const char *line2 = info->setup_url == NULL ? "AP FAIL" : "WEB FAIL";
         const char *lines[] = {"WIFI", line2};
         (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_TWO_LINES, lines, 2);

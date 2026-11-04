@@ -1,35 +1,26 @@
 # Architect handoff — `b03_hil`
 
-Status: **docs updated** for OE power-cycle glitch (2026-11-03). Firmware patch
-is **pending implementer**.
+Status: **`B03_RELAY_OLED_VIEW_MODE` docs complete** (2026-11-03). Firmware
+binding is **pending implementer**.
 
-## Active delta
+## Active handoff
 
-| ID | Doc / action |
+| ID | Doc |
 | --- | --- |
-| `B03_RELAY_OE_LEVEL_BEFORE_DIR` | Harden `docs/board_relay_control_architecture.md` init sequence |
-| (related) | `docs/board_product_architecture.md`, `docs/board_hardware_description.md` |
+| `B03_RELAY_OLED_VIEW_MODE` | `docs/board_relay_oled_view_mode_architecture.md` |
 
-Prior closed handoffs: `B03_PRODUCT_BRINGUP`, `B03_RELAY_CONTROL`,
-`B03_HOST_API_RELAY`.
+Also updated: `docs/board_main_relay_oled_architecture.md` (supersede reserved
+token rule).
 
 ## Tester input absorbed
 
-`agent-workspaces/tester/handoff.md` RCA: `gpio_config(OE, OUTPUT)` before
-inactive `gpio_set_level` drives `/KOE` low (active) briefly → short relay
-chatter on power cycle.
-
-## Architect deliverables (this turn)
-
-- Normative **level-before-direction** init sequence + forbidden anti-pattern
-- Power-cycle acceptance criterion #10 on relay control doc
-- Decision log entry; implementer reopened for `relay_ctrl_init` patch only
+During pulse / one-shot / train / encoder, OLED stayed `N:[0]` while coils/LEDs
+moved. Expected under old “emit only 0/1” rule; product now requires mode arming.
 
 ## Pending (implementer)
 
-See `agent-workspaces/implementer/handoff.md` — patch `relay_ctrl_init` only;
-no host API / pin map changes.
+See `agent-workspaces/implementer/handoff.md`:
 
-## Pending (tester after patch)
-
-Power-cycle / reset listen (and optional `/KOE` scope) per relay acceptance #10.
+1. Add `relay_ctrl_set_view_mode`.
+2. Arm/clear modes in `relay_sched` per binding table.
+3. Keep `drive*` view-inert; OLED refreshes via existing callback.

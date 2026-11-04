@@ -41,17 +41,20 @@ firmware without chat history by following this file plus:
 4. Early `relay_ctrl` bring-up (OE-safe) before WiFi work continues.
 5. Host API particular commands `relay_set`, `relay_set_all`, `relay_get`,
    `relay_get_all` (see relay host API doc).
-6. Keep **base** OLED provisioning / connect / failure / factory-reset UX.
+6. Keep **base** OLED provisioning / connect-failure / factory-reset UX.
 7. Adopt base `partitions.csv` + 4 MB flash defaults.
+8. Particular **STA-connected** OLED relay screen is specified separately in
+   `docs/board_main_relay_oled_architecture.md` (`B03_MAIN_RELAY_OLED`) — not
+   optional once that handoff is active.
 
 ### Out of scope (this handoff)
 
-- Particular OLED layout showing relay states (channel LEDs + host API only).
 - NVS persistence of relay on/off across reboot (cold boot → all off).
 - Streams, `echo`, `loopback` on this board.
 - Changing family WiFi / discovery / host transport contracts.
 - Editing `../pcb/`.
-- Calibration, PWM, or timed pulse modes for relays.
+- Calibration or timed pulse / train / encoder **drivers** (OLED tokens only
+  until those handoffs exist).
 
 ## Human decisions frozen
 
@@ -59,7 +62,8 @@ firmware without chat history by following this file plus:
 2. **Relay cold state:** after `relay_ctrl_init`, all six channels are **off**
    and OE is **enabled** (buffer driving lows into ULN).
 3. **No relay NVS** in v1.
-4. **OLED:** unchanged base templates; no particular metering-style main screen.
+4. **OLED:** base templates for SoftAP / failure / factory-reset; STA connected
+   uses particular relay screen (`B03_MAIN_RELAY_OLED`), not base `WIFI OK`.
 5. **Host API board strings:** `board_id` = `b03_hil`, `board_number` = `03`.
 6. **Do not** ship base demo commands `echo` / `loopback` on this board.
 

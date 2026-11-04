@@ -45,6 +45,23 @@ esp_err_t host_api_stream_read_handler(httpd_req_t *req);
 void host_api_stream_reset(void);
 cJSON *host_api_capabilities_build_result(void);
 
+esp_err_t host_api_handle_relay_pulse(const cJSON *args, cJSON **out_result, const char **err_code,
+                                      const char **err_msg);
+esp_err_t host_api_handle_relay_hold(const cJSON *args, cJSON **out_result, const char **err_code,
+                                     const char **err_msg);
+esp_err_t host_api_handle_relay_hold_many(const cJSON *args, cJSON **out_result,
+                                          const char **err_code, const char **err_msg);
+esp_err_t host_api_handle_relay_hold_cancel(const cJSON *args, cJSON **out_result,
+                                            const char **err_code, const char **err_msg);
+esp_err_t host_api_handle_relay_release_all(const cJSON *args, cJSON **out_result,
+                                            const char **err_code, const char **err_msg);
+esp_err_t host_api_handle_encoder_step(const cJSON *args, cJSON **out_result, const char **err_code,
+                                       const char **err_msg);
+esp_err_t host_api_handle_encoder_pulse_train(const cJSON *args, cJSON **out_result,
+                                              const char **err_code, const char **err_msg);
+esp_err_t host_api_handle_encoder_cancel(const cJSON *args, cJSON **out_result,
+                                         const char **err_code, const char **err_msg);
+
 #ifdef __cplusplus
 }
 #endif

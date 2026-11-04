@@ -2,6 +2,7 @@
 
 #include "device_identity.h"
 #include "relay_ctrl.h"
+#include "relay_sched.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -171,6 +172,7 @@ static esp_err_t handle_relay_set(const cJSON *args, cJSON **out_result, const c
     }
 
     const bool on_val = cJSON_IsTrue(on);
+    (void)relay_sched_preempt_channel(ch);
     const esp_err_t set_err = relay_ctrl_set(ch, on_val);
     if (set_err != ESP_OK) {
         *err_code = "internal";
@@ -250,6 +252,7 @@ static esp_err_t handle_relay_set_all(const cJSON *args, cJSON **out_result, con
         }
     }
 
+    (void)relay_sched_preempt_all();
     const esp_err_t set_err = relay_ctrl_set_mask(mask);
     if (set_err != ESP_OK) {
         *err_code = "internal";
@@ -304,6 +307,7 @@ static esp_err_t handle_relay_get(const cJSON *args, cJSON **out_result, const c
     }
     cJSON_AddNumberToObject(result, "channel", ch);
     cJSON_AddBoolToObject(result, "on", on);
+    cJSON_AddNumberToObject(result, "hold_remaining_ms", relay_sched_remaining_ms(ch));
     *out_result = result;
     return ESP_OK;
 }
@@ -322,6 +326,27 @@ static esp_err_t handle_relay_get_all(const cJSON *args, cJSON **out_result, con
     if (result == NULL) {
         return ESP_ERR_NO_MEM;
     }
+
+    cJSON *remaining = cJSON_CreateArray();
+    if (remaining == NULL) {
+        cJSON_Delete(result);
+        return ESP_ERR_NO_MEM;
+    }
+    for (int ch = RELAY_CTRL_CHANNEL_MIN; ch <= RELAY_CTRL_CHANNEL_MAX; ++ch) {
+        cJSON *n = cJSON_CreateNumber(relay_sched_remaining_ms(ch));
+        if (n == NULL || !cJSON_AddItemToArray(remaining, n)) {
+            cJSON_Delete(n);
+            cJSON_Delete(remaining);
+            cJSON_Delete(result);
+            return ESP_ERR_NO_MEM;
+        }
+    }
+    if (!cJSON_AddItemToObject(result, "hold_remaining_ms", remaining)) {
+        cJSON_Delete(remaining);
+        cJSON_Delete(result);
+        return ESP_ERR_NO_MEM;
+    }
+
     *out_result = result;
     return ESP_OK;
 }
@@ -386,6 +411,22 @@ esp_err_t host_api_command_handler(httpd_req_t *req)
         cmd_err = handle_relay_get(args, &result, &err_code, &err_msg);
     } else if (strcmp(name_copy, "relay_get_all") == 0) {
         cmd_err = handle_relay_get_all(args, &result, &err_code, &err_msg);
+    } else if (strcmp(name_copy, "relay_pulse") == 0) {
+        cmd_err = host_api_handle_relay_pulse(args, &result, &err_code, &err_msg);
+    } else if (strcmp(name_copy, "relay_hold") == 0) {
+        cmd_err = host_api_handle_relay_hold(args, &result, &err_code, &err_msg);
+    } else if (strcmp(name_copy, "relay_hold_many") == 0) {
+        cmd_err = host_api_handle_relay_hold_many(args, &result, &err_code, &err_msg);
+    } else if (strcmp(name_copy, "relay_hold_cancel") == 0) {
+        cmd_err = host_api_handle_relay_hold_cancel(args, &result, &err_code, &err_msg);
+    } else if (strcmp(name_copy, "relay_release_all") == 0) {
+        cmd_err = host_api_handle_relay_release_all(args, &result, &err_code, &err_msg);
+    } else if (strcmp(name_copy, "encoder_step") == 0) {
+        cmd_err = host_api_handle_encoder_step(args, &result, &err_code, &err_msg);
+    } else if (strcmp(name_copy, "encoder_pulse_train") == 0) {
+        cmd_err = host_api_handle_encoder_pulse_train(args, &result, &err_code, &err_msg);
+    } else if (strcmp(name_copy, "encoder_cancel") == 0) {
+        cmd_err = host_api_handle_encoder_cancel(args, &result, &err_code, &err_msg);
     } else {
         cJSON_Delete(root);
         host_api_unlock();
@@ -399,7 +440,7 @@ esp_err_t host_api_command_handler(httpd_req_t *req)
 
     if (cmd_err != ESP_OK) {
         cJSON_Delete(result);
-        if (cmd_err == ESP_ERR_INVALID_ARG) {
+        if (cmd_err == ESP_ERR_INVALID_ARG || cmd_err == ESP_ERR_INVALID_STATE) {
             return host_api_reply_error(req, id_copy, err_code, err_msg);
         }
         return host_api_reply_error(req, id_copy, "internal", "command handler failed");

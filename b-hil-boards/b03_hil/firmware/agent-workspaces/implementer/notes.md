@@ -37,7 +37,23 @@ exist on `app_core` for local callers; all sets go through `relay_ctrl` mutex.
   OUT=0 → brief `/KOE` active while CTR unsafe.
 - File touched: `components/relay_ctrl/relay_ctrl.c` only.
 
+## 2026-11-03 — `B03_MAIN_RELAY_OLED`
+
+- `app_core_relay_oled.c`: format/show FULL_FOUR_LINES; STA active flag.
+- `app_core_wifi.c`: `show_wifi_connected_display` → relay OLED; leave active
+  on SoftAP/connecting/failure.
+- `relay_ctrl`: view modes + `relay_ctrl_view_token`; static set notifies
+  listener; `relay_ctrl_drive*` for sched edges (no view/OLED spam).
+- `relay_sched`: all former `relay_ctrl_set` calls → `relay_ctrl_drive`.
+
+## 2026-11-03 — `B03_RELAY_OLED_VIEW_MODE`
+
+- Added `relay_ctrl_set_view_mode` (store + callback; no GPIO).
+- `relay_sched`: arm `P` on pulse/hold; `T` on pulse_train; `E` on both
+  encoder_step channels; clear to `STATIC_OFF` on timer end / cancel / abort.
+- `drive*` edges unchanged (no token flicker).
+
 ## Open / for tester
 
-- Power-cycle retest: no short relay chatter from OE bring-up.
-- Confirm OLED address and flash size on HW (architect open questions).
+- Confirm OLED `P`/`T`/`E` during sched programs, then `0` on end.
+- Static `0`/`1` live refresh still OK.

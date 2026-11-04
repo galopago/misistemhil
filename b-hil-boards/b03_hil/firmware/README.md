@@ -33,6 +33,8 @@ See:
   - `docs/board_product_architecture.md`
   - `docs/board_relay_control_architecture.md`
   - `docs/board_host_api_relay_architecture.md`
+  - `docs/board_main_relay_oled_architecture.md`
+  - `docs/board_relay_oled_view_mode_architecture.md`
 - `agent-workspaces/`: architect / implementer / tester role guides.
 - `tests/`: test documentation (no code yet).
 - Firmware `main/` / `components/` are added by the **implementer** from the

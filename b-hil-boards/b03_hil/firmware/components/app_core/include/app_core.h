@@ -28,6 +28,15 @@ esp_err_t app_core_relay_set(int channel, bool on);
 esp_err_t app_core_relay_set_mask(uint8_t mask);
 esp_err_t app_core_relay_get(int channel, bool *on_out);
 uint8_t app_core_relay_get_mask(void);
+esp_err_t app_core_relay_pulse(int channel, uint32_t duration_ms);
+esp_err_t app_core_relay_hold(int channel, uint32_t duration_ms);
+esp_err_t app_core_relay_release_all(void);
+
+/** STA-connected main relay OLED (`B03_MAIN_RELAY_OLED`). */
+void app_core_relay_oled_register(void);
+void app_core_relay_oled_set_active(bool active);
+bool app_core_relay_oled_is_active(void);
+void app_core_relay_oled_show(void);
 
 #ifdef __cplusplus
 }

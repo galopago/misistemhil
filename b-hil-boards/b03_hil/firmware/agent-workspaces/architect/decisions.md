@@ -42,3 +42,48 @@ relay chatter).
 - “Configure as OUTPUT, then set level” is an explicit anti-pattern for this
   board.
 - Implementer must patch `relay_ctrl_init`; architect does not edit firmware.
+
+## 2026-11-03 — Main relay OLED (`B03_MAIN_RELAY_OLED`)
+
+- STA-connected OLED replaces base `WIFI OK` five-line screen.
+- Layout: line 0 = `HIL-03-<MAC4>`; lines 1–3 = pairs
+  `1:[X]  2:[X]` / `3:[X]  4:[X]` / `5:[X]  6:[X]` (exactly two spaces;
+  square brackets; 12 chars/line).
+- Token alphabet: `0`/`1` stable static; `P` pulse; `T` train; `E` encoder.
+  Dynamic modes must **not** flicker `0`/`1` on the OLED.
+- Three tokens per line forbidden (overflow MEDIUM 16-char budget).
+- Pulse/train/encoder drivers deferred; formatter must accept reserved tokens.
+- Event-driven refresh on STA connect and static set; no required 2 Hz loop.
+
+## 2026-11-03 — OLED view-mode binding (`B03_RELAY_OLED_VIEW_MODE`)
+
+Tester: pulse/hold/train/encoder left OLED at `0` (LEDs moved). Cause:
+`relay_sched` used `relay_ctrl_drive*` only.
+
+- Authorize product `P`/`T`/`E` (no longer “reserved only”).
+- Add `relay_ctrl_set_view_mode` (mode only + callback; no GPIO).
+- `drive*` stays view-inert; edges do not flicker tokens.
+- Mapping: pulse/hold/hold_many → `P`; pulse_train → `T`; encoder_step A+B →
+  `E`; end/cancel → `STATIC_OFF` (then static set may apply `0`/`1`).
+- Hold shares token `P` (no separate `H`).
+- `relay_sched` must not call display APIs.
+
+## 2026-11-03 — Relay host API v2 for LLM (`B03_HOST_API_RELAY_V2_LLM`)
+
+- Timed actions are **non-blocking**: arm `esp_timer` / state machine; never
+  `vTaskDelay` for pulse/hold/encoder duration; HTTP returns immediately.
+- Per-channel one-shot release timers; `relay_pulse` and `relay_hold` share
+  backend (ranges 20…4000 vs 20…60000 ms).
+- `relay_hold_many` arms multiple channels in one request; one timer per channel.
+- Preempt: `relay_set` / `set_all` / `release_all` cancel timers and abort
+  encoder if channels overlap; re-arm replaces timer.
+- Electromechanical floors: min ON 20 ms; pulse-train period min 40 ms; out of
+  range → `bad_request` (no silent clamp); publish `capabilities.timing_limits`.
+- `encoder_step`: exactly two channels + `direction` + `period_ms` (speed);
+  4 quadrature states per step.
+- `encoder_pulse_train`: exactly one channel; no `direction`; `pulse_ms` +
+  `period_ms`.
+- One encoder run at a time; second → `busy`.
+- Suggested module `relay_sched` calling `relay_ctrl`; host_api must not GPIO.
+- Authoritative doc: `docs/board_host_api_relay_v2_architecture.md`.
+
