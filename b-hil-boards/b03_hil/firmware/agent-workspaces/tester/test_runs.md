@@ -263,3 +263,53 @@ Build **PASS**. Flash **PASS**. Boot check next / pending slow P/T/E human walk.
 ### Human observation
 
 **PASS** (human 2026-11-03): `P`/`T`/`E` then clear to `0` confirmed.
+
+## 2026-11-04T17:06 — Slow board health retest
+
+| Field | Value |
+| --- | --- |
+| Target | `http://HIL-03-F06F.local` (`192.168.1.11`) |
+| API | **PASS** (~88 s) |
+| Coverage | info/capabilities; v1 K1…K6 + mask=5; pulse→`P`; train→`T`; encoder→`E` |
+
+### Human observation
+
+**PASS** (human 2026-11-04): board still OK (clicks + OLED).
+
+## 2026-11-04T20:47 / 20:53 / 21:14 — External panel LED wiring walks
+
+| Field | Value |
+| --- | --- |
+| Target | `http://HIL-03-F06F.local` |
+| API | **PASS** each run (~84 s) |
+| Purpose | Verify J1 EXT LEDs while human finished / fixed polarity |
+
+### Human observation
+
+**PASS** (human 2026-11-04, final cabling): K1…K6 external LEDs OK
+(+ mask=5, pulse/train/encoder). Earlier polarity was reversed; corrected.
+
+## 2026-11-04T21:44 — Build + flash OLED relay pair order
+
+| Field | Value |
+| --- | --- |
+| Change | GUI pairs `1/4`, `2/5`, `3/6` (`app_core_relay_oled.c`) |
+| ESP-IDF | v5.3.4 |
+| Port | `/dev/ttyACM0` |
+| Commands | `idf.py build` + `idf.py -p /dev/ttyACM0 flash` |
+
+### Result
+
+Build **PASS**. Flash **PASS**. Expect OLED lines: `1:[X]  4:[X]` / `2:[X]  5:[X]` / `3:[X]  6:[X]`.
+
+## 2026-11-04T21:48 — Slow corroboration (new OLED pair order)
+
+| Field | Value |
+| --- | --- |
+| Target | `http://HIL-03-F06F.local` |
+| API | **PASS** (~83 s) |
+| Coverage | K1…K6 + mask=5 + pulse/train/encoder vs layout `1/4 2/5 3/6` |
+
+### Human observation
+
+**PASS** (human 2026-11-04): OLED order + panel LEDs perfecto.

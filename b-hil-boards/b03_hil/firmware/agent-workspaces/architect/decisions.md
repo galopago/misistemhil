@@ -46,9 +46,9 @@ relay chatter).
 ## 2026-11-03 — Main relay OLED (`B03_MAIN_RELAY_OLED`)
 
 - STA-connected OLED replaces base `WIFI OK` five-line screen.
-- Layout: line 0 = `HIL-03-<MAC4>`; lines 1–3 = pairs
-  `1:[X]  2:[X]` / `3:[X]  4:[X]` / `5:[X]  6:[X]` (exactly two spaces;
-  square brackets; 12 chars/line).
+- Layout: line 0 = `HIL-03-<MAC4>`; lines 1–3 = hardware columns
+  `1:[X]  4:[X]` / `2:[X]  5:[X]` / `3:[X]  6:[X]` (left 1→2→3, right 4→5→6;
+  exactly two spaces; square brackets; 12 chars/line).
 - Token alphabet: `0`/`1` stable static; `P` pulse; `T` train; `E` encoder.
   Dynamic modes must **not** flicker `0`/`1` on the OLED.
 - Three tokens per line forbidden (overflow MEDIUM 16-char budget).

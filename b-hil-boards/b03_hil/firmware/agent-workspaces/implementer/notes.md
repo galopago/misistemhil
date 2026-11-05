@@ -53,7 +53,11 @@ exist on `app_core` for local callers; all sets go through `relay_ctrl` mutex.
   encoder_step channels; clear to `STATIC_OFF` on timer end / cancel / abort.
 - `drive*` edges unchanged (no token flicker).
 
+## 2026-11-04 — `B03_RELAY_OLED_COLUMN_ORDER`
+
+- `app_core_relay_oled_show`: pairs `(1,4)`, `(2,5)`, `(3,6)` instead of
+  sequential `(1,2)` / `(3,4)` / `(5,6)`.
+
 ## Open / for tester
 
-- Confirm OLED `P`/`T`/`E` during sched programs, then `0` on end.
-- Static `0`/`1` live refresh still OK.
+- Confirm STA OLED column order matches hardware silk columns.

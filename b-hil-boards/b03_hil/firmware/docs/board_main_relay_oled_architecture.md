@@ -78,7 +78,9 @@ and display-delivery docs.
 1. Aesthetic token form is exactly `N:[X]` with **square brackets** (examples
    `1:[0]`, `2:[1]`, `3:[P]`).
 2. Two channels per content line (width budget); three content lines cover six
-   relays.
+   relays in **hardware column order**: left column `1→2→3` (top→bottom),
+   right column `4→5→6` (top→bottom) — same cell grammar `N:[X]`, only the
+   channel pairing per line changes vs a linear 1…6 reading order.
 3. OLED shows **view mode**, not instantaneous coil voltage for dynamic modes.
 4. Relay main screen is shown **only while WiFi STA is connected**.
 5. SoftAP provisioning, connect-in-progress, connect-failure, and factory-reset
@@ -121,9 +123,18 @@ budget).
 
 ```text
 Line 0: HIL-03-<MAC4>           # mDNS / SoftAP identity; no ".local"
-Line 1: 1:[0]  2:[1]            # channels 1 and 2
-Line 2: 3:[P]  4:[T]            # channels 3 and 4 (examples)
-Line 3: 5:[E]  6:[0]            # channels 5 and 6
+Line 1: 1:[0]  4:[1]            # left col ch1, right col ch4
+Line 2: 2:[P]  5:[T]            # left col ch2, right col ch5
+Line 3: 3:[E]  6:[0]            # left col ch3, right col ch6
+```
+
+Hardware-aligned columns (normative):
+
+```text
+        LEFT          RIGHT
+Line1    1:[X]         4:[X]
+Line2    2:[X]         5:[X]
+Line3    3:[X]         6:[X]
 ```
 
 ### Line 0 — hostname
@@ -154,23 +165,26 @@ Two cells per line, separated by **exactly two** ASCII spaces:
 ```text
 Index:  0 1 2 3 4 5 6 7 8 9 10 11
         N : [ X ]   N : [  X  ]
-Example: 1 : [ 0 ]   2 : [  1  ]
+Example: 1 : [ 0 ]   4 : [  1  ]
 ```
 
 Exact 12-character line body (≤ 16):
 
 ```text
-1:[0]  2:[1]
-3:[P]  4:[T]
-5:[E]  6:[0]
+1:[0]  4:[1]
+2:[P]  5:[T]
+3:[E]  6:[0]
 ```
 
 Rules:
 
-- Line 1 **MUST** be channels **1** then **2** (left to right).
-- Line 2 **MUST** be channels **3** then **4**.
-- Line 3 **MUST** be channels **5** then **6**.
+- Line 1 **MUST** be channels **1** then **4** (left → right).
+- Line 2 **MUST** be channels **2** then **5**.
+- Line 3 **MUST** be channels **3** then **6**.
+- Reading **down the left column** is `1`, `2`, `3`; **down the right column**
+  is `4`, `5`, `6` (matches PCB/front-panel order).
 - Separator between cells **MUST** be exactly two spaces (`0x20 0x20`).
+- **MUST NOT** use the old linear pairing `1–2` / `3–4` / `5–6` on lines 1–3.
 - **MUST NOT** put three `N:[X]` cells on one line (19+ characters; overflows
   MEDIUM budget).
 - **MUST NOT** use round parentheses `()` or other bracket styles.
@@ -347,21 +361,23 @@ Board number for identity is **`03`** → `HIL-03-<MAC4>`.
 ## Acceptance criteria
 
 1. With STA connected, OLED shows exactly four lines: hostname without
-   `.local`, then `1:[…]  2:[…]`, `3:[…]  4:[…]`, `5:[…]  6:[…]` with square
+   `.local`, then `1:[…]  4:[…]`, `2:[…]  5:[…]`, `3:[…]  6:[…]` with square
    brackets and two-space separators (12 characters on lines 1–3).
 2. After `relay_set` channel 1 on (STA connected), line 1 left cell becomes
-   `1:[1]` without requiring reboot.
+   `1:[1]` without requiring reboot; channel 4 remains the right cell of line 1.
 3. After all-off, cells show `N:[0]` for every channel.
-4. During SoftAP provisioning, base QR/status UX runs; relay screen **MUST
+4. Channel 3 on updates line 3 left (`3:[1]`); channel 6 on updates line 3
+   right (`6:[1]`) — not the old linear `5–6` pairing.
+5. During SoftAP provisioning, base QR/status UX runs; relay screen **MUST
    NOT** appear.
-5. SoftAP SSID, mDNS hostname, and OLED line 0 use the same `HIL-03-<MAC4>`
+6. SoftAP SSID, mDNS hostname, and OLED line 0 use the same `HIL-03-<MAC4>`
    string (no `.local` on OLED).
-6. Only `app_core` calls display controller / `app_core_display_show_*` APIs.
-7. `relay_ctrl` has no display includes.
-8. Formatter supports tokens `0|1|P|T|E`. Static paths emit `0`/`1`; sched
+7. Only `app_core` calls display controller / `app_core_display_show_*` APIs.
+8. `relay_ctrl` has no display includes.
+9. Formatter supports tokens `0|1|P|T|E`. Static paths emit `0`/`1`; sched
    paths emit `P`/`T`/`E` per view-mode binding doc.
-9. No continuous OLED update storm from electrical edges (event-driven on
-   view-mode change, not on every `drive` edge).
+10. No continuous OLED update storm from electrical edges (event-driven on
+    view-mode change, not on every `drive` edge).
 
 ## Validation notes (tester)
 

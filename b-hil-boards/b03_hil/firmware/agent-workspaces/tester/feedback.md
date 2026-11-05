@@ -102,3 +102,52 @@ API PASS. Human (2026-11-03): **confirmed** — tokens now correct.
 | encoder K3/K4 → `[E]` then `[0]` | yes | |
 
 Overall: **PASS** (`B03_RELAY_OLED_VIEW_MODE`).
+
+## 2026-11-04 — Slow board health retest
+
+API PASS. Human (2026-11-04): **todo OK**.
+
+| Check | OK? |
+| --- | --- |
+| K1…K6 clicks + OLED `0`/`1` | yes |
+| mask=5 | yes |
+| pulse → `P` → `0` | yes |
+| train → `T` → `0` | yes |
+| encoder → `E` → `0` | yes |
+
+Overall: **PASS** (board still healthy).
+
+## 2026-11-04 — External panel LEDs (slow walk)
+
+First run: polarity wrong (human). Retest after reverse wiring — API PASS (~84 s).
+
+| Check | Ext LED OK? | Notes |
+| --- | --- | --- |
+| K1…K6 ON/OFF | (superseded) | polarity was wrong |
+| mask=5 / pulse / train / encoder | (superseded) | see cableado final |
+
+Overall: failed polarity; fixed by human; closed in cableado final below.
+
+## 2026-11-04 — External panel LEDs (cableado final)
+
+API PASS (~84 s). Human (2026-11-04): **todo OK** after finished wiring
+(earlier polarity was reversed; corrected).
+
+| Check | Ext LED OK? | Notes |
+| --- | --- | --- |
+| K1…K6 ON/OFF | yes | |
+| mask=5 (K1+K3) | yes | |
+| pulse / train / encoder | yes | |
+
+Overall: **PASS** (external panel LEDs).
+
+## 2026-11-04 — OLED pair order `1/4 2/5 3/6` slow corroboration
+
+API PASS. Human (2026-11-04): **todo perfecto**.
+
+| Check | OK? |
+| --- | --- |
+| K1…K6 vs OLED + panel LED | yes |
+| mask=5 / pulse / train / encoder | yes |
+
+Overall: **PASS** (new OLED pair order).

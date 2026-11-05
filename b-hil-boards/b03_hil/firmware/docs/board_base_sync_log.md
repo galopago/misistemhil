@@ -122,3 +122,18 @@ Actions taken in this repo:
 Open questions:
   - none for token mapping; optional host JSON mode field later
 ```
+
+## Sync entry
+
+```text
+Consumed IDs: (particular OLED column order; no new BASE-CHANGE)
+Date consumed: 2026-11-04
+Agent role: architect (docs)
+Actions taken in this repo:
+  - B03_RELAY_OLED_COLUMN_ORDER: lines pair 1|4, 2|5, 3|6 (left 1→2→3,
+    right 4→5→6) in docs/board_main_relay_oled_architecture.md
+  - Reopened implementer handoff for app_core_relay_oled.c pairing only
+  - code: none (architect hard stop)
+Open questions:
+  - none
+```

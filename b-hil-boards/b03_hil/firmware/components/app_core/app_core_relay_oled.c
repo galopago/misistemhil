@@ -37,9 +37,10 @@ void app_core_relay_oled_show(void)
         return;
     }
 
-    format_pair_line(s_line1, sizeof(s_line1), 1, 2);
-    format_pair_line(s_line2, sizeof(s_line2), 3, 4);
-    format_pair_line(s_line3, sizeof(s_line3), 5, 6);
+    /* B03_RELAY_OLED_COLUMN_ORDER: hardware columns 1|4, 2|5, 3|6. */
+    format_pair_line(s_line1, sizeof(s_line1), 1, 4);
+    format_pair_line(s_line2, sizeof(s_line2), 2, 5);
+    format_pair_line(s_line3, sizeof(s_line3), 3, 6);
 
     const char *lines[] = {s_line0, s_line1, s_line2, s_line3};
     (void)app_core_display_show_template(DISPLAY_TEMPLATE_FULL_FOUR_LINES, lines, 4);

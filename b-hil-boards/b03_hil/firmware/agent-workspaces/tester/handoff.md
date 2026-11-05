@@ -1,6 +1,4 @@
 # Tester handoff — `b03_hil`
 
-Status: **PASS** (2026-11-03) — `B03_RELAY_OLED_VIEW_MODE` validated
-(API + human): pulse/hold→`P`, train→`T`, encoder→`E`, end→`0`.
-
-No open defects from this validation.
+Status: **PASS** (2026-11-04) — OLED relay pair order `1/4 2/5 3/6`
+validated (API + human). Panel LEDs still aligned. No open defects.
