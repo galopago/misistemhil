@@ -1,0 +1,9 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "CustomParts_Local")(type "KiCad")(uri "${KIPRJMOD}/library/CustomParts_Local.pretty")(options "")(descr "Local copy of global CustomParts from kicad-7-custom-library"))
+  (lib (name "MountingHoleSmall")(type "KiCad")(uri "${KIPRJMOD}/library/MountingHoleSmall.pretty")(options "")(descr ""))
+  (lib (name "PanelMountConnector")(type "KiCad")(uri "${KIPRJMOD}/library/PanelMountConnector.pretty")(options "")(descr ""))
+  (lib (name "MountingHoleDisplay")(type "KiCad")(uri "${KIPRJMOD}/library/MountingHoleDisplay.pretty")(options "")(descr ""))
+  (lib (name "MountingHoleConnector")(type "KiCad")(uri "${KIPRJMOD}/library/MountingHoleConnector.pretty")(options "")(descr ""))
+  (lib (name "MountingHoleSwitch")(type "KiCad")(uri "${KIPRJMOD}/library/MountingHoleSwitch.pretty")(options "")(descr ""))
+)
