@@ -1,0 +1,16 @@
+espefuse.py v4.9.0
+Connecting...
+
+=== Run "adc_info" command ===
+Block version: 103
+Temperature Sensor Calibration = -9.9C
+ADC OCode        =  89
+ADC1:
+INIT_CODE_ATTEN0 =  1592
+INIT_CODE_ATTEN1 =  -112
+INIT_CODE_ATTEN2 =  -204
+INIT_CODE_ATTEN3 =  -680
+CAL_VOL_ATTEN0   =  -336
+CAL_VOL_ATTEN1   =  -92
+CAL_VOL_ATTEN2   =  -300
+CAL_VOL_ATTEN3   =  -436

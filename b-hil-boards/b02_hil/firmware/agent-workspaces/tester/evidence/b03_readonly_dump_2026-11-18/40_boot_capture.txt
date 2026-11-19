@@ -1,0 +1,96 @@
+[0;32mI (114) esp_image: segment 1: paddr=000341b4 vaddr=3fc93e00 size=02f10h ( 12048) load[0m
+[0;32mI (117) esp_image: segment 2: paddr=000370cc vaddr=40380000 size=08f4ch ( 36684) load[0m
+[0;32mI (127) esp_image: segment 3: paddr=00040020 vaddr=42000020 size=bd4ech (775404) map[0m
+[0;32mI (254) esp_image: segment 4: paddr=000fd514 vaddr=40388f4c size=0ae20h ( 44576) load[0m
+[0;32mI (269) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (269) boot: Disabling RNG early entropy source...[0m
+[0;32mI (281) cpu_start: Unicore app[0m
+[0;32mI (289) cpu_start: Pro cpu start user code[0m
+[0;32mI (290) cpu_start: cpu freq: 160000000 Hz[0m
+[0;32mI (290) app_init: Application information:[0m
+[0;32mI (292) app_init: Project name:     b03_hil_firmware[0m
+[0;32mI (298) app_init: App version:      b2012bf-dirty[0m
+[0;32mI (304) app_init: Compile time:     Nov  4 2026 21:45:24[0m
+[0;32mI (310) app_init: ELF file SHA256:  7b715e1b2...[0m
+[0;32mI (315) app_init: ESP-IDF:          v5.3.4[0m
+[0;32mI (320) efuse_init: Min chip rev:     v0.3[0m
+[0;32mI (324) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (329) efuse_init: Chip rev:         v0.4[0m
+[0;32mI (334) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (341) heap_init: At 3FCA9890 len 00016770 (89 KiB): RAM[0m
+[0;32mI (347) heap_init: At 3FCC0000 len 0001C710 (113 KiB): Retention RAM[0m
+[0;32mI (354) heap_init: At 3FCDC710 len 00002950 (10 KiB): Retention RAM[0m
+[0;32mI (361) heap_init: At 50000000 len 00001FE8 (7 KiB): RTCRAM[0m
+[0;32mI (369) spi_flash: detected chip: generic[0m
+[0;32mI (372) spi_flash: flash io: dio[0m
+[0;32mI (377) sleep: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (383) sleep: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (390) main_task: Started on CPU0[0m
+[0;32mI (390) main_task: Calling app_main()[0m
+[0;32mI (390) b03_hil: Starting b03_hil firmware[0m
+[0;32mI (400) app_core: Board: b03_hil[0m
+[0;32mI (400) gpio: GPIO[2]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 [0m
+[0;32mI (410) gpio: GPIO[3]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 [0m
+[0;32mI (420) gpio: GPIO[4]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 [0m
+[0;32mI (430) gpio: GPIO[9]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 [0m
+[0;32mI (440) gpio: GPIO[10]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 [0m
+[0;32mI (450) gpio: GPIO[20]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 [0m
+[0;32mI (460) gpio: GPIO[21]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 [0m
+[0;32mI (470) relay_ctrl: OE enabled, mask=0x00[0m
+[0;32mI (470) relay_sched: relay_sched ready[0m
+[0;32mI (480) app_core: I2C SCL GPIO0 SDA GPIO1[0m
+[0;32mI (480) gpio: GPIO[1]| InputEn: 1| OutputEn: 1| OpenDrain: 1| Pullup: 1| Pulldown: 0| Intr:0 [0m
+[0;32mI (490) gpio: GPIO[0]| InputEn: 1| OutputEn: 1| OpenDrain: 1| Pullup: 1| Pulldown: 0| Intr:0 [0m
+[0;32mI (500) i2c_bus: I2C bus ready on SCL GPIO0 SDA GPIO1 at 400000 Hz[0m
+[0;32mI (510) display_geom: Display geometry self-test passed[0m
+[0;32mI (510) setup_url: self-test passed[0m
+[0;32mI (520) app_core: OLED detected at I2C address 0x3D[0m
+[0;32mI (520) i2c_bus: Registered I2C device 0x3D[0m
+[0;32mI (530) display_driver: SSD1306 initialized at I2C address 0x3D[0m
+[0;32mI (530) display_task: Display task running[0m
+[0;32mI (540) display_task: Display task started[0m
+[0;32mI (540) gpio: GPIO[8]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 [0m
+[0;32mI (560) gpio: GPIO[7]| InputEn: 1| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0 [0m
+[0;32mI (560) pp: pp rom version: 9387209[0m
+[0;32mI (570) net80211: net80211 rom version: 9387209[0m
+I (580) wifi:wifi driver task: 3fcb4d14, prio:23, stack:6656, core=0
+I (580) wifi:wifi firmware version: d2d8792
+I (580) wifi:wifi certification version: v7.0
+I (580) wifi:config NVS flash: enabled
+I (590) wifi:config nano formating: disabled
+I (590) wifi:Init data frame dynamic rx buffer num: 32
+I (600) wifi:Init static rx mgmt buffer num: 5
+I (600) wifi:Init management short buffer num: 32
+I (610) wifi:Init dynamic tx buffer num: 32
+I (610) wifi:Init static tx FG buffer num: 2
+I (610) wifi:Init static rx buffer size: 1600
+I (620) wifi:Init static rx buffer num: 10
+I (620) wifi:Init dynamic rx buffer num: 32
+[0;32mI (630) wifi_init: rx ba win: 6[0m
+[0;32mI (630) wifi_init: accept mbox: 6[0m
+[0;32mI (630) wifi_init: tcpip mbox: 32[0m
+[0;32mI (640) wifi_init: udp mbox: 6[0m
+[0;32mI (640) wifi_init: tcp mbox: 6[0m
+[0;32mI (640) wifi_init: tcp tx win: 5760[0m
+[0;32mI (650) wifi_init: tcp rx win: 5760[0m
+[0;32mI (650) wifi_init: tcp mss: 1440[0m
+[0;32mI (660) wifi_init: WiFi IRAM OP enabled[0m
+[0;32mI (660) wifi_init: WiFi RX IRAM OP enabled[0m
+[0;32mI (670) mdns_mem: mDNS task will be created from internal RAM[0m
+[0;32mI (670) gpio: GPIO[7]| InputEn: 1| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0 [0m
+[0;32mI (680) wifi_prov: AP netif ip=192.168.4.1 gw=192.168.4.1 netmask=255.255.255.0[0m
+[0;32mI (690) device_id: identity HIL-03-F06F[0m
+[0;32mI (690) wifi_prov: provisioning AP SSID generated ssid=HIL-03-F06F[0m
+[0;32mI (700) wifi_prov: starting SoftAP ssid=HIL-03-F06F mode=AP[0m
+[0;32mI (710) phy_init: phy_version 1201,bae5dd99,Mar  3 2025,15:36:21[0m
+[0;32mI (760) phy_init: Saving new calibration data due to checksum failure or outdated calibration data, mode(0)[0m
+I (780) wifi:mode : softAP (8c:d0:b2:a7:f0:6f)
+I (780) wifi:Total power save buffer number: 16
+I (780) wifi:Init max length of beacon: 752/752
+I (780) wifi:Init max length of beacon: 752/752
+[0;32mI (780) wifi_prov: SoftAP started[0m
+[0;32mI (790) esp_netif_lwip: DHCP server started on interface WIFI_AP_DEF with IP: 192.168.4.1[0m
+[0;32mI (830) wifi_prov: HTTP server started on port 80[0m
+[0;32mI (830) wifi_prov: HTTP handlers registered (GET /, GET /health, POST /provision)[0m
+[0;32mI (830) wifi_prov: provisioning portal ready at http://192.168.4.1[0m
+[0;32mI (840) main_task: Returned from app_main()[0m

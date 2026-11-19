@@ -1,0 +1,14 @@
+esptool.py v4.9.0
+File size: 1003585 (bytes)
+Detected image type: ESP32-C3
+Image version: 1
+Entry point: 403802dc
+5 segments
+
+Segment 1: len 0x22a7c load 0x3c0c0020 file_offs 0x00000018 [DROM]
+Segment 2: len 0x02f10 load 0x3fc94000 file_offs 0x00022a9c [DRAM,BYTE_ACCESSIBLE]
+Segment 3: len 0x0a65c load 0x40380000 file_offs 0x000259b4 [IRAM]
+Segment 4: len 0xbb800 load 0x42000020 file_offs 0x00030018 [IROM]
+Segment 5: len 0x097ec load 0x4038a65c file_offs 0x000eb820 [IRAM]
+Checksum: 69 (valid)
+Validation Hash: a3323158acbaa5c9f9d10f4b17317f4b06555b817f4868d58c3e6f2462f7caf2 (valid)

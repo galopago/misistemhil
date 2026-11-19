@@ -1,0 +1,2 @@
+022344244dc5a38d2bb686c24006a9f9d15547cefabc9d17efbcd1b854eb3fe8  /tmp/hil_b06_softap_nvs/nvs_0x9000_0x6000.bin
+16c6abab5b359f0c015288e668a481e9784adc37761742be6e412a0c34b4f633  /tmp/hil_dut_readonly_dump/nvs_0x9000_0x6000.bin

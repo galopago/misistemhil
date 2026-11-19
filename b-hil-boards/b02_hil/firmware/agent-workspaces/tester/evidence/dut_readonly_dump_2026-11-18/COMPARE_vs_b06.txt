@@ -1,0 +1,19 @@
+Read-only compare: failing DUT a4:cb:8f:22:59:80 vs working b06 8c:d0:b2:a9:24:cd
+
+IDENTICAL (software image path):
+- factory app exact SHA256: 22f14d88...48c505 (same binary)
+- bootloader region hash: same
+- partition table: same
+- phy_init at dump: both all 0xFF (same empty partition)
+
+DIFFER (chip/OTP / SPI flash identity — not SoftAP source):
+- STA MAC: b06=8c:d0:b2:a9:24:cd vs DUT=a4:cb:8f:22:59:80 (expected per chip)
+- SPI flash JEDEC Manufacturer: b06=0x20 vs DUT=0x46 (both Device=0x4016, size 4MB)
+- eFuse FLASH_TEMP: b06=85C vs DUT=105C (both VENDOR=XMC, CAP=4M)
+- flash status register: b06=0x0200 vs DUT=0x0000
+- OPTIONAL_UNIQUE_ID: b06=all 0 vs DUT=nonzero
+- BLOCK_USR_DATA: b06=populated vs DUT=zeros
+- NVS contents differ (DUT SoftAP/no STA creds; b06 had STA creds)
+
+BOOT on DUT after dump reset: SoftAP HIL-06-5981 started (serial) — visibility still the open human check.
+

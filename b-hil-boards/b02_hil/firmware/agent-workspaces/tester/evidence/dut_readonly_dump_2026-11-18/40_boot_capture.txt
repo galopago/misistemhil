@@ -1,0 +1,89 @@
+[0;32mI (120) esp_image: segment 1: paddr=00032aa4 vaddr=3fc94000 size=02f10h ( 12048) load[0m
+[0;32mI (123) esp_image: segment 2: paddr=000359bc vaddr=40380000 size=0a65ch ( 42588) load[0m
+[0;32mI (134) esp_image: segment 3: paddr=00040020 vaddr=42000020 size=bb800h (768000) map[0m
+[0;32mI (260) esp_image: segment 4: paddr=000fb828 vaddr=4038a65c size=097ech ( 38892) load[0m
+[0;32mI (273) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (274) boot: Disabling RNG early entropy source...[0m
+[0;32mI (285) cpu_start: Unicore app[0m
+[0;32mI (294) cpu_start: Pro cpu start user code[0m
+[0;32mI (294) cpu_start: cpu freq: 160000000 Hz[0m
+[0;32mI (294) app_init: Application information:[0m
+[0;32mI (297) app_init: Project name:     b06_hil_firmware[0m
+[0;32mI (303) app_init: App version:      15101ee-dirty[0m
+[0;32mI (308) app_init: Compile time:     Nov  3 2026 18:34:14[0m
+[0;32mI (314) app_init: ELF file SHA256:  e8e6c910e...[0m
+[0;32mI (319) app_init: ESP-IDF:          v5.3.4[0m
+[0;32mI (324) efuse_init: Min chip rev:     v0.3[0m
+[0;32mI (329) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (334) efuse_init: Chip rev:         v0.4[0m
+[0;32mI (339) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (346) heap_init: At 3FCA9930 len 000166D0 (89 KiB): RAM[0m
+[0;32mI (352) heap_init: At 3FCC0000 len 0001C710 (113 KiB): Retention RAM[0m
+[0;32mI (359) heap_init: At 3FCDC710 len 00002950 (10 KiB): Retention RAM[0m
+[0;32mI (366) heap_init: At 50000000 len 00001FE8 (7 KiB): RTCRAM[0m
+[0;32mI (373) spi_flash: detected chip: generic[0m
+[0;32mI (377) spi_flash: flash io: dio[0m
+[0;32mI (381) sleep: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (387) sleep: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (395) main_task: Started on CPU0[0m
+[0;32mI (395) main_task: Calling app_main()[0m
+[0;32mI (395) b06_hil: Starting b06_hil firmware[0m
+[0;32mI (405) app_core: Board: b06_hil[0m
+[0;32mI (405) app_core: I2C SCL GPIO0 SDA GPIO1[0m
+[0;32mI (415) gpio: GPIO[1]| InputEn: 1| OutputEn: 1| OpenDrain: 1| Pullup: 1| Pulldown: 0| Intr:0 [0m
+[0;32mI (425) gpio: GPIO[0]| InputEn: 1| OutputEn: 1| OpenDrain: 1| Pullup: 1| Pulldown: 0| Intr:0 [0m
+[0;32mI (435) i2c_bus: I2C bus ready on SCL GPIO0 SDA GPIO1 at 400000 Hz[0m
+[0;32mI (435) display_geom: Display geometry self-test passed[0m
+[0;32mI (445) setup_url: self-test passed[0m
+[0;33mW (445) app_core: OLED not detected at 0x3C or 0x3D; starting display stub[0m
+[0;32mI (455) display_driver: Display driver initialized without I2C device (stub mode)[0m
+[0;32mI (465) display_task: Display task running[0m
+[0;32mI (465) display_task: Display task started[0m
+[0;33mW (475) app_core_meter: INA219 OUT 1 not present at 0x42[0m
+[0;33mW (475) app_core_meter: INA219 OUT 2 not present at 0x41[0m
+[0;33mW (485) app_core_meter: INA219 OUT 3 not present at 0x40[0m
+[0;32mI (495) gpio: GPIO[8]| InputEn: 0| OutputEn: 1| OpenDrain: 0| Pullup: 0| Pulldown: 0| Intr:0 [0m
+[0;32mI (505) gpio: GPIO[7]| InputEn: 1| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0 [0m
+[0;32mI (515) pp: pp rom version: 9387209[0m
+[0;32mI (515) net80211: net80211 rom version: 9387209[0m
+I (525) wifi:wifi driver task: 3fcb5bb8, prio:23, stack:6656, core=0
+I (525) wifi:wifi firmware version: d2d8792
+I (525) wifi:wifi certification version: v7.0
+I (535) wifi:config NVS flash: enabled
+I (535) wifi:config nano formating: disabled
+I (535) wifi:Init data frame dynamic rx buffer num: 32
+I (545) wifi:Init static rx mgmt buffer num: 5
+I (545) wifi:Init management short buffer num: 32
+I (555) wifi:Init dynamic tx buffer num: 32
+I (555) wifi:Init static tx FG buffer num: 2
+I (565) wifi:Init static rx buffer size: 1600
+I (565) wifi:Init static rx buffer num: 10
+I (565) wifi:Init dynamic rx buffer num: 32
+[0;32mI (575) wifi_init: rx ba win: 6[0m
+[0;32mI (575) wifi_init: accept mbox: 6[0m
+[0;32mI (585) wifi_init: tcpip mbox: 32[0m
+[0;32mI (585) wifi_init: udp mbox: 6[0m
+[0;32mI (585) wifi_init: tcp mbox: 6[0m
+[0;32mI (595) wifi_init: tcp tx win: 5760[0m
+[0;32mI (595) wifi_init: tcp rx win: 5760[0m
+[0;32mI (605) wifi_init: tcp mss: 1440[0m
+[0;32mI (605) wifi_init: WiFi IRAM OP enabled[0m
+[0;32mI (605) wifi_init: WiFi RX IRAM OP enabled[0m
+[0;32mI (615) mdns_mem: mDNS task will be created from internal RAM[0m
+[0;32mI (625) gpio: GPIO[7]| InputEn: 1| OutputEn: 0| OpenDrain: 0| Pullup: 1| Pulldown: 0| Intr:0 [0m
+[0;32mI (625) wifi_prov: AP netif ip=192.168.4.1 gw=192.168.4.1 netmask=255.255.255.0[0m
+[0;32mI (635) device_id: identity HIL-06-5981[0m
+[0;32mI (645) wifi_prov: provisioning AP SSID generated ssid=HIL-06-5981[0m
+[0;32mI (655) wifi_prov: starting SoftAP ssid=HIL-06-5981 mode=AP[0m
+[0;32mI (655) phy_init: phy_version 1201,bae5dd99,Mar  3 2025,15:36:21[0m
+[0;32mI (695) phy_init: Saving new calibration data due to checksum failure or outdated calibration data, mode(0)[0m
+I (705) wifi:mode : softAP (a4:cb:8f:22:59:81)
+I (705) wifi:Total power save buffer number: 16
+I (705) wifi:Init max length of beacon: 752/752
+I (705) wifi:Init max length of beacon: 752/752
+[0;32mI (715) wifi_prov: SoftAP started[0m
+[0;32mI (715) esp_netif_lwip: DHCP server started on interface WIFI_AP_DEF with IP: 192.168.4.1[0m
+[0;32mI (755) wifi_prov: HTTP server started on port 80[0m
+[0;32mI (755) wifi_prov: HTTP handlers registered (GET /, GET /health, POST /provision)[0m
+[0;32mI (765) wifi_prov: provisioning portal ready at http://192.168.4.1[0m
+[0;32mI (765) main_task: Returned from app_main()[0m
